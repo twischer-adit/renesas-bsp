@@ -189,6 +189,14 @@ struct sh_msiof_spi_priv {
 #define IER_RFOVFE	0x00000008 /* Receive FIFO Overflow Enable */
 
 
+static int msiof_rcar_is_gen3(struct device *dev)
+{
+	struct device_node *node = dev->of_node;
+
+	return of_device_is_compatible(node, "renesas,msiof-r8a7795") ||
+		of_device_is_compatible(node, "renesas,msiof-r8a7796");
+}
+
 static u32 sh_msiof_read(struct sh_msiof_spi_priv *p, int reg_offs)
 {
 	switch (reg_offs) {
@@ -1255,6 +1263,8 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
 	const struct sh_msiof_chipdata *chipdata;
 	const struct of_device_id *of_id;
 	struct sh_msiof_spi_priv *p;
+	struct clk *ref_clk;
+	u32 clk_rate = 0;
 	int i;
 	int ret;
 
@@ -1349,6 +1359,17 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		dev_err(&pdev->dev, "spi_register_master error.\n");
 		goto err2;
+	}
+
+	if (msiof_rcar_is_gen3(&master->dev)) {
+		ref_clk = devm_clk_get(&pdev->dev, "msiof_ref_clk");
+		if (!IS_ERR(ref_clk))
+			clk_rate = clk_get_rate(ref_clk);
+		if (clk_rate) {
+			clk_prepare_enable(p->clk);
+			clk_set_rate(p->clk, clk_rate);
+			clk_disable_unprepare(p->clk);
+		}
 	}
 
 	ret = RCAR_PRR_INIT();
