@@ -940,6 +940,12 @@ static int vsp1_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	if (vsp1->info->header_mode && !(RCAR_PRR_IS_PRODUCT(H3) &&
+		(RCAR_PRR_CHK_CUT(H3, WS11) <= 0)))
+		vsp1->auto_fld_mode = true;
+	else
+		vsp1->auto_fld_mode = false;
+
 	/* Instanciate entities */
 	ret = vsp1_create_entities(vsp1);
 	if (ret < 0) {
@@ -960,7 +966,6 @@ static int vsp1_probe(struct platform_device *pdev)
 		vsp1_gen3_vspd_check(vsp1))
 		fcpv_reg[vsp1->index] =
 			ioremap(fcpvd_offset[vsp1->index], 0x20);
-
 done:
 	if (ret)
 		pm_runtime_disable(&pdev->dev);

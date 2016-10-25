@@ -53,6 +53,7 @@ struct vsp1_rwpf {
 
 	u32 mult_alpha;
 	u32 outfmt;
+	unsigned int offsets[2];
 
 	struct {
 		spinlock_t lock;
@@ -65,6 +66,8 @@ struct vsp1_rwpf {
 	struct vsp1_rwpf_memory mem;
 
 	struct vsp1_dl_manager *dlm;
+
+	bool interlaced;
 };
 
 static inline struct vsp1_rwpf *to_rwpf(struct v4l2_subdev *subdev)
