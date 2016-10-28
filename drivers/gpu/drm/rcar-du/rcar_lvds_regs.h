@@ -76,4 +76,8 @@
 #define LVDCHCR_CHSEL_CH(n, c)		((((c) - (n)) & 3) << ((n) * 4))
 #define LVDCHCR_CHSEL_MASK(n)		(3 << ((n) * 4))
 
+#define SRCR7		0xE61501CC
+#define SRSTCLR7	0xE615095C
+#define SRCR7_LVDS	(1 << 27)
+
 #endif /* __RCAR_LVDS_REGS_H__ */
