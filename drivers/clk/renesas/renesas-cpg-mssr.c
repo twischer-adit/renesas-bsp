@@ -87,6 +87,8 @@ static struct hw_register cpg_ip_regs[] = {
 
 static struct rcar_ip cpg_ip = {
 	.ip_name   = "CPG",
+	.base_addr = 0xE6150000,
+	.size      = 0xAF8,
 	.reg_count = ARRAY_SIZE(cpg_ip_regs),
 	.ip_reg    = cpg_ip_regs,
 };
@@ -636,7 +638,6 @@ static int __init cpg_mssr_probe(struct platform_device *pdev)
 	priv->num_core_clks = info->num_total_core_clks;
 	priv->num_mod_clks = info->num_hw_mod_clks;
 	priv->last_dt_core_clk = info->last_dt_core_clk;
-	platform_set_drvdata(pdev, priv);
 
 	for (i = 0; i < nclks; i++)
 		clks[i] = ERR_PTR(-ENOENT);
@@ -670,14 +671,12 @@ static int cpg_mssr_suspend(struct device *dev)
 {
 	int ret = 0;
 #ifdef CONFIG_RCAR_DDR_BACKUP
-	struct cpg_mssr_priv *priv;
-
 	pr_debug("%s\n", __func__);
-
-	priv = dev_get_drvdata(dev);
-
-	if (!cpg_ip.virt_addr)
-		cpg_ip.virt_addr = priv->base;
+	if (!cpg_ip.virt_addr) {
+		ret = rcar_handle_registers(&cpg_ip, DO_IOREMAP);
+		if (ret)
+			return ret;
+	}
 
 	ret = rcar_handle_registers(&cpg_ip, DO_BACKUP);
 #endif /* CONFIG_RCAR_DDR_BACKUP */
