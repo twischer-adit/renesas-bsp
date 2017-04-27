@@ -673,12 +673,12 @@ static int cpg_mssr_suspend(struct device *dev)
 #ifdef CONFIG_RCAR_DDR_BACKUP
 	pr_debug("%s\n", __func__);
 	if (!cpg_ip.virt_addr) {
-		ret = rcar_handle_registers(&cpg_ip, DO_IOREMAP);
+		ret = handle_registers(&cpg_ip, DO_IOREMAP);
 		if (ret)
 			return ret;
 	}
 
-	ret = rcar_handle_registers(&cpg_ip, DO_BACKUP);
+	ret = handle_registers(&cpg_ip, DO_BACKUP);
 #endif /* CONFIG_RCAR_DDR_BACKUP */
 	return ret;
 }
@@ -688,7 +688,7 @@ static int cpg_mssr_resume(struct device *dev)
 	int ret = 0;
 #ifdef CONFIG_RCAR_DDR_BACKUP
 	pr_debug("%s\n", __func__);
-	ret = rcar_handle_registers(&cpg_ip, DO_RESTORE);
+	ret = handle_registers(&cpg_ip, DO_RESTORE);
 #endif /* CONFIG_RCAR_DDR_BACKUP */
 	return ret;
 }
