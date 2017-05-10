@@ -18,6 +18,7 @@
 #define USB30_CLKSET0	0x034
 #define USB30_CLKSET1	0x036
 #define USB30_SSC_SET	0x038
+#define USB30_VBUS_EN	0x064
 
 #define CLKSET0_RESERVED		0x05c0
 #define CLKSET0_USB_EXTAL		(CLKSET0_RESERVED | 0x0002)
@@ -37,6 +38,8 @@
 #define SSC_SET_RANGE_4980	(0x0 << SSC_SET_RANGE_SHIFT)
 #define SSC_SET_RANGE_4492	(0x1 << SSC_SET_RANGE_SHIFT)
 #define SSC_SET_RANGE_4003	(0x2 << SSC_SET_RANGE_SHIFT)
+
+#define VBUS_EN_VBUS_EN		BIT(1)
 
 struct rcar_gen3_usb3 {
 	void __iomem *base;
@@ -85,6 +88,9 @@ static int rcar_gen3_phy_usb3_init(struct phy *p)
 		rcar_gen3_phy_usb3_select_usb_extal(r);
 	if (r->ssc_range)
 		rcar_gen3_phy_usb3_enable_ssc(r);
+
+	/* Enables VBUS detection anyway */
+	writew(VBUS_EN_VBUS_EN, r->base + USB30_VBUS_EN);
 
 	return 0;
 }
