@@ -45,7 +45,18 @@
 #define	DWL_24		(5 << 19)	/* Data Word Length */
 #define	DWL_32		(6 << 19)	/* Data Word Length */
 
-#define	SWL_32		(3 << 16)	/* R/W System Word Length */
+/*
+ * System word length
+ */
+#define	SWL_8           (0 << 16)       /* R/W System Word Length */
+#define	SWL_16          (1 << 16)       /* R/W System Word Length */
+#define	SWL_24          (2 << 16)       /* R/W System Word Length */
+#define	SWL_32          (3 << 16)       /* R/W System Word Length */
+#define	SWL_48          (4 << 16)       /* R/W System Word Length */
+#define	SWL_64          (5 << 16)       /* R/W System Word Length */
+#define	SWL_128         (6 << 16)       /* R/W System Word Length */
+#define	SWL_256         (7 << 16)       /* R/W System Word Length */
+
 #define	SCKD		(1 << 15)	/* Serial Bit Clock Direction */
 #define	SWSD		(1 << 14)	/* Serial WS Direction */
 #define	SCKP		(1 << 13)	/* Serial Bit Clock Polarity */
@@ -223,8 +234,26 @@ u32 rsnd_ssi_multi_slaves_runtime(struct rsnd_dai_stream *io)
 	return 0;
 }
 
+static u32 rsnd_get_swl(struct rsnd_dai *rdai)
+{
+	u32 swl = SWL_32;
+
+	switch (rdai->slot_width) {
+	case 32:
+		swl = SWL_32;
+		break;
+	case 24:
+		swl = SWL_24;
+		break;
+	case 16:
+		swl = SWL_16;
+		break;
+	}
+	return swl;
+}
+
 unsigned int rsnd_ssi_clk_query(struct rsnd_priv *priv,
-		       int param1, int param2, int *idx)
+		       int param1, int param2, int param3, int *idx)
 {
 	int ssi_clk_mul_table[] = {
 		1, 2, 4, 8, 16, 6, 12,
@@ -243,12 +272,7 @@ unsigned int rsnd_ssi_clk_query(struct rsnd_priv *priv,
 		if (j == 0)
 			continue;
 
-		/*
-		 * this driver is assuming that
-		 * system word is 32bit x chan
-		 * see rsnd_ssi_init()
-		 */
-		main_rate = 32 * param1 * param2 * ssi_clk_mul_table[j];
+		main_rate = param1 * param2 * param3 * ssi_clk_mul_table[j];
 
 		ret = rsnd_adg_clk_query(priv, main_rate);
 		if (ret < 0)
@@ -276,6 +300,8 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 	unsigned int rate = rsnd_io_is_play(io) ?
 		rsnd_src_get_out_rate(priv, io) :
 		rsnd_src_get_in_rate(priv, io);
+	int slot_width = rdai->slot_width;
+	u32 swl = rsnd_get_swl(rdai);
 
 	if (!rsnd_rdai_is_clk_master(rdai))
 		return 0;
@@ -295,7 +321,7 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 		return 0;
 	}
 
-	main_rate = rsnd_ssi_clk_query(priv, rate, chan, &idx);
+	main_rate = rsnd_ssi_clk_query(priv, rate, chan, slot_width, &idx);
 	if (!main_rate) {
 		dev_err(dev, "unsupported clock rate\n");
 		return -EIO;
@@ -315,7 +341,7 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 	 * SSICR  : FORCE, SCKD, SWSD
 	 * SSIWSR : CONT
 	 */
-	ssi->cr_clk = FORCE | SWL_32 | SCKD | SWSD | CKDV(idx);
+	ssi->cr_clk = FORCE | swl | SCKD | SWSD | CKDV(idx);
 	ssi->wsr = CONT;
 	ssi->rate = rate;
 
@@ -356,6 +382,7 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	u32 cr_own;
 	u32 cr_mode;
 	u32 wsr;
+	u32 swl;
 	int is_tdm;
 
 	if (rsnd_ssi_is_parent(mod, io))
@@ -363,11 +390,9 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
 
-	/*
-	 * always use 32bit system word.
-	 * see also rsnd_ssi_master_clk_enable()
-	 */
-	cr_own = FORCE | SWL_32;
+	swl = rsnd_get_swl(rdai);
+
+	cr_own = FORCE | swl;
 
 	if (rdai->bit_clk_inv)
 		cr_own |= SCKP;
@@ -488,7 +513,16 @@ static int rsnd_ssi_hw_params(struct rsnd_mod *mod,
 			      struct snd_pcm_hw_params *params)
 {
 	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
 	int chan = params_channels(params);
+	unsigned int fmt_width = snd_pcm_format_width(params_format(params));
+
+	if (fmt_width > rdai->slot_width) {
+		dev_err(dev, "invalid combination of slot-width and format-data-width\n");
+		return -EINVAL;
+	}
 
 	/*
 	 * snd_pcm_ops::hw_params will be called *before*
@@ -965,6 +999,7 @@ static void rsnd_ssi_connect(struct rsnd_mod *mod,
 			rsnd_dai_connect(mod, io, type);
 			rsnd_rdai_channels_set(rdai, (i + 1) * 2);
 			rsnd_rdai_ssi_lane_set(rdai, (i + 1));
+			rsnd_rdai_width_set(rdai, rdai->slot_width);
 			return;
 		}
 	}

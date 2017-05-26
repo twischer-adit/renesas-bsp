@@ -108,6 +108,8 @@
 #define RSND_RATES SNDRV_PCM_RATE_8000_192000
 #define RSND_FMTS (SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S16_LE)
 
+#define RSND_DEFAULT_SLOT_WIDTH	32
+
 static const struct of_device_id rsnd_of_match[] = {
 	{ .compatible = "renesas,rcar_sound-gen1", .data = (void *)RSND_GEN1 },
 	{ .compatible = "renesas,rcar_sound-gen2", .data = (void *)RSND_GEN2 },
@@ -544,6 +546,15 @@ int rsnd_rdai_ssi_lane_ctrl(struct rsnd_dai *rdai,
 	return rdai->ssi_lane;
 }
 
+int rsnd_rdai_width_ctrl(struct rsnd_dai *rdai,
+			    int slot_width)
+{
+	if (slot_width > 0)
+		rdai->slot_width = slot_width;
+
+	return rdai->slot_width;
+}
+
 struct rsnd_dai *rsnd_rdai_get(struct rsnd_priv *priv, int id)
 {
 	if ((id < 0) || (id >= rsnd_rdai_nr(priv)))
@@ -715,6 +726,11 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
 	struct device *dev = rsnd_priv_to_dev(priv);
 
+	if (slot_width != 16 && slot_width != 24 && slot_width != 32) {
+		dev_err(dev, "unsupported slot width value: %d\n", slot_width);
+		return -EINVAL;
+	}
+
 	switch (slots) {
 	case 2:
 	case 6:
@@ -722,6 +738,7 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 		/* TDM Extend Mode */
 		rsnd_rdai_channels_set(rdai, slots);
 		rsnd_rdai_ssi_lane_set(rdai, 1);
+		rsnd_rdai_width_set(rdai, slot_width);
 		break;
 	default:
 		dev_err(dev, "unsupported TDM slots (%d)\n", slots);
@@ -750,13 +767,15 @@ static unsigned int rsnd_soc_hw_rate_list[] = {
 	192000,
 };
 
-static int rsnd_soc_hw_rule(struct rsnd_priv *priv,
+static int rsnd_soc_hw_rule(struct rsnd_dai *rdai,
 			    unsigned int *list, int list_num,
 			    struct snd_interval *baseline, struct snd_interval *iv)
 {
+	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
 	struct snd_interval p;
 	unsigned int rate;
 	int i;
+	int slot_width = rsnd_rdai_width_get(rdai);
 
 	snd_interval_any(&p);
 	p.min = UINT_MAX;
@@ -767,15 +786,15 @@ static int rsnd_soc_hw_rule(struct rsnd_priv *priv,
 		if (!snd_interval_test(iv, list[i]))
 			continue;
 
-		rate = rsnd_ssi_clk_query(priv,
-					  baseline->min, list[i], NULL);
+		rate = rsnd_ssi_clk_query(priv, baseline->min,
+					  list[i], slot_width, NULL);
 		if (rate > 0) {
 			p.min = min(p.min, list[i]);
 			p.max = max(p.max, list[i]);
 		}
 
-		rate = rsnd_ssi_clk_query(priv,
-					  baseline->max, list[i], NULL);
+		rate = rsnd_ssi_clk_query(priv, baseline->max,
+					  list[i], slot_width, NULL);
 		if (rate > 0) {
 			p.min = min(p.min, list[i]);
 			p.max = max(p.max, list[i]);
@@ -794,7 +813,6 @@ static int __rsnd_soc_hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval ic;
 	struct snd_soc_dai *dai = rule->private;
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
-	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
 	struct rsnd_dai_stream *io = is_play ? &rdai->playback : &rdai->capture;
 
 	/*
@@ -806,7 +824,7 @@ static int __rsnd_soc_hw_rule_rate(struct snd_pcm_hw_params *params,
 	ic.min =
 	ic.max = rsnd_runtime_channel_for_ssi_with_params(io, params);
 
-	return rsnd_soc_hw_rule(priv, rsnd_soc_hw_rate_list,
+	return rsnd_soc_hw_rule(rdai, rsnd_soc_hw_rate_list,
 				ARRAY_SIZE(rsnd_soc_hw_rate_list),
 				&ic, ir);
 }
@@ -832,7 +850,6 @@ static int __rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 	struct snd_interval ic;
 	struct snd_soc_dai *dai = rule->private;
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
-	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
 	struct rsnd_dai_stream *io = is_play ? &rdai->playback : &rdai->capture;
 
 	/*
@@ -844,7 +861,7 @@ static int __rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 	ic.min =
 	ic.max = rsnd_runtime_channel_for_ssi_with_params(io, params);
 
-	return rsnd_soc_hw_rule(priv, rsnd_soc_hw_channels_list,
+	return rsnd_soc_hw_rule(rdai, rsnd_soc_hw_channels_list,
 				ARRAY_SIZE(rsnd_soc_hw_channels_list),
 				ir, &ic);
 }
@@ -1067,6 +1084,7 @@ static void __rsnd_dai_probe(struct rsnd_priv *priv,
 	rdai->capture.rdai		= rdai;
 	rsnd_rdai_channels_set(rdai, 2); /* default 2ch */
 	rsnd_rdai_ssi_lane_set(rdai, 1); /* default 1lane */
+	rsnd_rdai_width_set(rdai, RSND_DEFAULT_SLOT_WIDTH); /* 32bits */
 
 	for (io_i = 0;; io_i++) {
 		playback = of_parse_phandle(dai_np, "playback", io_i);
