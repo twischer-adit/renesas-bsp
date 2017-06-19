@@ -105,7 +105,7 @@
 #include <linux/pm_runtime.h>
 #include "rsnd.h"
 
-#define RSND_RATES SNDRV_PCM_RATE_8000_192000
+#define RSND_RATES SNDRV_PCM_RATE_CONTINUOUS
 #define RSND_FMTS (SNDRV_PCM_FMTBIT_S8 |\
 		   SNDRV_PCM_FMTBIT_S24_LE |\
 		   SNDRV_PCM_FMTBIT_S16_LE)
@@ -1304,6 +1304,8 @@ static void __rsnd_dai_probe(struct rsnd_priv *priv,
 	snprintf(rdai->playback.name, RSND_DAI_NAME_SIZE,
 		 "DAI%d Playback", dai_i);
 	drv->playback.rates		= RSND_RATES;
+	drv->playback.rate_min		= 8000;
+	drv->playback.rate_max		= 192000;
 	drv->playback.formats		= RSND_FMTS;
 	drv->playback.channels_min	= 1;
 	drv->playback.channels_max	= 16;
@@ -1312,6 +1314,8 @@ static void __rsnd_dai_probe(struct rsnd_priv *priv,
 	snprintf(rdai->capture.name, RSND_DAI_NAME_SIZE,
 		 "DAI%d Capture", dai_i);
 	drv->capture.rates		= RSND_RATES;
+	drv->capture.rate_min		= 8000;
+	drv->capture.rate_max		= 192000;
 	drv->capture.formats		= RSND_FMTS;
 	drv->capture.channels_min	= 1;
 	drv->capture.channels_max	= 16;
