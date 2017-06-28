@@ -507,6 +507,9 @@ void rsnd_dai_period_elapsed(struct rsnd_dai_stream *io);
 int rsnd_dai_connect(struct rsnd_mod *mod,
 		     struct rsnd_dai_stream *io,
 		     enum rsnd_mod_type type);
+void rsnd_dai_disconnect(struct rsnd_mod *mod,
+			 struct rsnd_dai_stream *io,
+			 enum rsnd_mod_type type);
 
 /*
  *	R-Car Gen1/Gen2

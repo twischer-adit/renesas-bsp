@@ -521,9 +521,9 @@ int rsnd_dai_connect(struct rsnd_mod *mod,
 	return 0;
 }
 
-static void rsnd_dai_disconnect(struct rsnd_mod *mod,
-				struct rsnd_dai_stream *io,
-				enum rsnd_mod_type type)
+void rsnd_dai_disconnect(struct rsnd_mod *mod,
+			 struct rsnd_dai_stream *io,
+			 enum rsnd_mod_type type)
 {
 	io->mod[type] = NULL;
 }
