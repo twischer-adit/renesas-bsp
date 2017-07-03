@@ -666,6 +666,7 @@ dai_trigger_end:
 static int rsnd_soc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
+	int ret;
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -714,6 +715,14 @@ static int rsnd_soc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	default:
 		break;
 	}
+
+	ret = rsnd_dai_call(set_fmt, &rdai->playback, fmt);
+	if (ret)
+		return ret;
+
+	ret = rsnd_dai_call(set_fmt, &rdai->capture, fmt);
+	if (ret)
+		return ret;
 
 	return 0;
 }

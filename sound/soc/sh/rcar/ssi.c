@@ -545,6 +545,44 @@ static int rsnd_ssi_hw_params(struct rsnd_mod *mod,
 	return 0;
 }
 
+static int rsnd_ssi_set_fmt(struct rsnd_mod *mod,
+			    struct rsnd_dai_stream *io,
+			    unsigned int fmt)
+{
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	struct rsnd_priv *priv = rsnd_mod_to_priv(mod);
+	int id;
+
+	if (!__rsnd_ssi_is_pin_sharing(mod))
+		return 0;
+
+	if (!rsnd_rdai_is_clk_master(rdai))
+		return 0;
+
+	switch (rsnd_mod_id(mod)) {
+	case 1:
+	case 2:
+		id = 0;
+		break;
+	case 4:
+		id = 3;
+		break;
+	case 8:
+		id = 7;
+		break;
+	default:
+		return 0;
+	}
+
+	if (rsnd_rdai_is_clk_master(rdai))
+		rsnd_dai_connect(rsnd_ssi_mod_get(priv, id), io, RSND_MOD_SSIP);
+	else
+		rsnd_dai_disconnect(rsnd_ssi_mod_get(priv, id), io,
+				    RSND_MOD_SSIP);
+
+	return 0;
+}
+
 static int rsnd_ssi_start(struct rsnd_mod *mod,
 			  struct rsnd_dai_stream *io,
 			  struct rsnd_priv *priv)
@@ -693,49 +731,6 @@ static irqreturn_t rsnd_ssi_interrupt(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-/*
- *		SSI PIO
- */
-static void rsnd_ssi_parent_attach(struct rsnd_mod *mod,
-				   struct rsnd_dai_stream *io)
-{
-	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
-	struct rsnd_priv *priv = rsnd_mod_to_priv(mod);
-
-	if (!__rsnd_ssi_is_pin_sharing(mod))
-		return;
-
-	if (!rsnd_rdai_is_clk_master(rdai))
-		return;
-
-	switch (rsnd_mod_id(mod)) {
-	case 1:
-	case 2:
-		rsnd_dai_connect(rsnd_ssi_mod_get(priv, 0), io, RSND_MOD_SSIP);
-		break;
-	case 4:
-		rsnd_dai_connect(rsnd_ssi_mod_get(priv, 3), io, RSND_MOD_SSIP);
-		break;
-	case 8:
-		rsnd_dai_connect(rsnd_ssi_mod_get(priv, 7), io, RSND_MOD_SSIP);
-		break;
-	}
-}
-
-static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
-			    struct rsnd_dai_stream *io,
-			    struct snd_soc_pcm_runtime *rtd)
-{
-	/*
-	 * rsnd_rdai_is_clk_master() will be enabled after set_fmt,
-	 * and, pcm_new will be called after it.
-	 * This function reuse pcm_new at this point.
-	 */
-	rsnd_ssi_parent_attach(mod, io);
-
-	return 0;
-}
-
 static int rsnd_ssi_common_probe(struct rsnd_mod *mod,
 				 struct rsnd_dai_stream *io,
 				 struct rsnd_priv *priv)
@@ -753,7 +748,6 @@ static int rsnd_ssi_common_probe(struct rsnd_mod *mod,
 
 	/*
 	 * It can't judge ssi parent at this point
-	 * see rsnd_ssi_pcm_new()
 	 */
 
 	ret = rsnd_ssiu_attach(io, mod);
@@ -890,8 +884,8 @@ static struct rsnd_mod_ops rsnd_ssi_pio_ops = {
 	.stop	= rsnd_ssi_stop,
 	.irq	= rsnd_ssi_irq,
 	.pointer = rsnd_ssi_pio_pointer,
-	.pcm_new = rsnd_ssi_pcm_new,
 	.hw_params = rsnd_ssi_hw_params,
+	.set_fmt = rsnd_ssi_set_fmt,
 };
 
 static int rsnd_ssi_dma_probe(struct rsnd_mod *mod,
@@ -965,9 +959,9 @@ static struct rsnd_mod_ops rsnd_ssi_dma_ops = {
 	.start	= rsnd_ssi_start,
 	.stop	= rsnd_ssi_stop,
 	.irq	= rsnd_ssi_irq,
-	.pcm_new = rsnd_ssi_pcm_new,
 	.fallback = rsnd_ssi_fallback,
 	.hw_params = rsnd_ssi_hw_params,
+	.set_fmt = rsnd_ssi_set_fmt,
 };
 
 int rsnd_ssi_is_dma_mode(struct rsnd_mod *mod)
