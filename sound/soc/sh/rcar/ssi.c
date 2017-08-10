@@ -395,12 +395,14 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	u32 cr_mode;
 	u32 wsr;
 	u32 swl;
+	int chnl;
 	int is_tdm;
 	int is_monaural;
 
 	if (rsnd_ssi_is_parent(mod, io))
 		return;
 
+	chnl = rsnd_runtime_channel_for_ssi(io);
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
 	is_monaural = rsnd_runtime_is_ssi_monaural(io);
 
@@ -448,7 +450,19 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 		wsr |= WIDTH_1;
 	} else if (is_tdm) {
 		wsr	|= WS_MODE;
-		cr_own	|= CHNL_8;
+
+		switch (chnl) {
+		case 4:
+			cr_own |= CHNL_4;
+			break;
+		case 6:
+			cr_own |= CHNL_6;
+			break;
+		case 8:
+		default:
+			cr_own |= CHNL_8;
+			break;
+		}
 	}
 
 	ssi->cr_own	= cr_own;

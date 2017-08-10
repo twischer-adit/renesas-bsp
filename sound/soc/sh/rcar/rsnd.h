@@ -420,7 +420,9 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 				 struct snd_pcm_hw_params *params);
 int rsnd_runtime_is_ssi_multi(struct rsnd_dai_stream *io);
 int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io);
+int rsnd_runtime_is_ssi_tdm_extend(struct rsnd_dai_stream *io);
 int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io);
+int rsnd_runtime_is_ssi_mono(struct rsnd_dai_stream *io);
 
 /*
  * DT

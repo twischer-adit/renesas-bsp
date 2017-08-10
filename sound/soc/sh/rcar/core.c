@@ -273,7 +273,14 @@ int rsnd_runtime_is_ssi_multi(struct rsnd_dai_stream *io)
 
 int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io)
 {
-	return rsnd_runtime_channel_for_ssi(io) >= 6;
+	return rsnd_runtime_channel_for_ssi(io) >= 4;
+}
+
+int rsnd_runtime_is_ssi_tdm_extend(struct rsnd_dai_stream *io)
+{
+	int chan = rsnd_runtime_channel_for_ssi(io);
+
+	return  (chan == 6 || chan == 8);
 }
 
 int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io)
@@ -755,6 +762,8 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	case 1:
 		/* Monaural */
 	case 2:
+		/* Stereo Mode */
+	case 4:
 	case 6:
 	case 8:
 		/* TDM Extend Mode */
