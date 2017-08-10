@@ -276,6 +276,11 @@ int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io)
 	return rsnd_runtime_channel_for_ssi(io) >= 6;
 }
 
+int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io)
+{
+	return rsnd_runtime_channel_for_ssi(io) == 1;
+}
+
 /*
  *	ADINR function
  */
@@ -747,6 +752,8 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	}
 
 	switch (slots) {
+	case 1:
+		/* Monaural */
 	case 2:
 	case 6:
 	case 8:
@@ -1083,7 +1090,7 @@ static void __rsnd_dai_probe(struct rsnd_priv *priv,
 		 "DAI%d Playback", dai_i);
 	drv->playback.rates		= RSND_RATES;
 	drv->playback.formats		= RSND_FMTS;
-	drv->playback.channels_min	= 2;
+	drv->playback.channels_min	= 1;
 	drv->playback.channels_max	= 8;
 	drv->playback.stream_name	= rdai->playback.name;
 
@@ -1091,7 +1098,7 @@ static void __rsnd_dai_probe(struct rsnd_priv *priv,
 		 "DAI%d Capture", dai_i);
 	drv->capture.rates		= RSND_RATES;
 	drv->capture.formats		= RSND_FMTS;
-	drv->capture.channels_min	= 2;
+	drv->capture.channels_min	= 1;
 	drv->capture.channels_max	= 8;
 	drv->capture.stream_name	= rdai->capture.name;
 

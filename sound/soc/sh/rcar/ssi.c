@@ -57,6 +57,15 @@
 #define	SWL_128         (6 << 16)       /* R/W System Word Length */
 #define	SWL_256         (7 << 16)       /* R/W System Word Length */
 
+#define	SWL_MONO_16	(0 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_32	(1 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_48	(2 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_64	(3 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_96	(4 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_128	(5 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_256	(6 << 16)	/* R/W System Word Length */
+#define	SWL_MONO_512	(7 << 16)	/* R/W System Word Length */
+
 #define	SCKD		(1 << 15)	/* Serial Bit Clock Direction */
 #define	SWSD		(1 << 14)	/* Serial WS Direction */
 #define	SCKP		(1 << 13)	/* Serial Bit Clock Polarity */
@@ -81,6 +90,9 @@
  */
 #define CONT		(1 << 8)	/* WS Continue Function */
 #define WS_MODE		(1 << 0)	/* WS Mode */
+#define MONO		(1 << 1)	/* WS Monaural Format */
+
+#define WIDTH_1		(1 << 16)	/* One cycle of SCK */
 
 #define SSI_NAME "ssi"
 
@@ -234,19 +246,19 @@ u32 rsnd_ssi_multi_slaves_runtime(struct rsnd_dai_stream *io)
 	return 0;
 }
 
-static u32 rsnd_get_swl(struct rsnd_dai *rdai)
+static u32 rsnd_get_swl(struct rsnd_dai *rdai, bool is_monaural)
 {
-	u32 swl = SWL_32;
+	u32 swl = is_monaural ? SWL_MONO_32 : SWL_32;
 
 	switch (rdai->slot_width) {
 	case 32:
-		swl = SWL_32;
+		swl = is_monaural ? SWL_MONO_32 : SWL_32;
 		break;
 	case 24:
-		swl = SWL_24;
+		swl = is_monaural ? SWL_MONO_32 : SWL_24;
 		break;
 	case 16:
-		swl = SWL_16;
+		swl = is_monaural ? SWL_MONO_16 : SWL_16;
 		break;
 	}
 	return swl;
@@ -301,7 +313,7 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 		rsnd_src_get_out_rate(priv, io) :
 		rsnd_src_get_in_rate(priv, io);
 	int slot_width = rdai->slot_width;
-	u32 swl = rsnd_get_swl(rdai);
+	u32 swl = rsnd_get_swl(rdai, rsnd_runtime_is_ssi_monaural(io));
 
 	if (!rsnd_rdai_is_clk_master(rdai))
 		return 0;
@@ -384,21 +396,23 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	u32 wsr;
 	u32 swl;
 	int is_tdm;
+	int is_monaural;
 
 	if (rsnd_ssi_is_parent(mod, io))
 		return;
 
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
+	is_monaural = rsnd_runtime_is_ssi_monaural(io);
 
-	swl = rsnd_get_swl(rdai);
+	swl = rsnd_get_swl(rdai, is_monaural);
 
 	cr_own = FORCE | swl;
 
 	if (rdai->bit_clk_inv)
 		cr_own |= SCKP;
-	if (rdai->frm_clk_inv ^ is_tdm)
+	if (rdai->frm_clk_inv ^ (is_tdm | is_monaural))
 		cr_own |= SWSP;
-	if (rdai->data_alignment)
+	if (rdai->data_alignment && !is_monaural)
 		cr_own |= SDTA;
 	if (rdai->sys_delay)
 		cr_own |= DEL;
@@ -427,7 +441,12 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	 *	rsnd_ssiu_init_gen2()
 	 */
 	wsr = ssi->wsr;
-	if (is_tdm) {
+
+	if (is_monaural) {
+		wsr |= WS_MODE;
+		wsr |= MONO;
+		wsr |= WIDTH_1;
+	} else if (is_tdm) {
 		wsr	|= WS_MODE;
 		cr_own	|= CHNL_8;
 	}

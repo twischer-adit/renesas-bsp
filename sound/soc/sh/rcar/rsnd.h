@@ -420,6 +420,7 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 				 struct snd_pcm_hw_params *params);
 int rsnd_runtime_is_ssi_multi(struct rsnd_dai_stream *io);
 int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io);
+int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io);
 
 /*
  * DT
@@ -468,7 +469,7 @@ struct rsnd_dai {
 	struct rsnd_priv *priv;
 	struct snd_pcm_hw_constraint_list constraint;
 
-	int max_channels;	/* 2ch - 16ch */
+	int max_channels;	/* 1ch - 16ch */
 	int ssi_lane;		/* 1lane - 4lane */
 	int slot_width;		/* 16,24,32bits */
 
