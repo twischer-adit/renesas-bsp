@@ -253,9 +253,13 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 	if (rsnd_runtime_is_ssi_multi(io))
 		chan /= rsnd_rdai_ssi_lane_get(rdai);
 
-	/* TDM Extend Mode needs 8ch */
-	if (chan == 6)
-		chan = 8;
+	/* TDM Extend Mode needs special handling */
+	if (rsnd_ssi_tdm_mode(io) == TDM_MODE_EXTENDED) {
+		if (chan == 6)
+			chan = 8;
+		else if (chan == 8)
+			chan = 6;
+	}
 
 	return chan;
 }
@@ -274,13 +278,6 @@ int rsnd_runtime_is_ssi_multi(struct rsnd_dai_stream *io)
 int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io)
 {
 	return rsnd_runtime_channel_for_ssi(io) >= 4;
-}
-
-int rsnd_runtime_is_ssi_tdm_extend(struct rsnd_dai_stream *io)
-{
-	int chan = rsnd_runtime_channel_for_ssi(io);
-
-	return  (chan == 6 || chan == 8);
 }
 
 int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io)
@@ -766,7 +763,6 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	case 4:
 	case 6:
 	case 8:
-		/* TDM Extend Mode */
 		rsnd_rdai_channels_set(rdai, slots);
 		rsnd_rdai_ssi_lane_set(rdai, 1);
 		rsnd_rdai_width_set(rdai, slot_width);
@@ -1355,6 +1351,7 @@ int rsnd_kctrl_new(struct rsnd_mod *mod,
 				  struct rsnd_mod *mod),
 		   struct rsnd_kctrl_cfg *cfg,
 		   const char * const *texts,
+		   unsigned int index,
 		   int size,
 		   u32 max)
 {
@@ -1364,7 +1361,7 @@ int rsnd_kctrl_new(struct rsnd_mod *mod,
 		.iface		= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name		= name,
 		.info		= rsnd_kctrl_info,
-		.index		= rtd->num,
+		.index		= index,
 		.get		= rsnd_kctrl_get,
 		.put		= rsnd_kctrl_put,
 	};

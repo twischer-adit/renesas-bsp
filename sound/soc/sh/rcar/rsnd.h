@@ -420,9 +420,7 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 				 struct snd_pcm_hw_params *params);
 int rsnd_runtime_is_ssi_multi(struct rsnd_dai_stream *io);
 int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io);
-int rsnd_runtime_is_ssi_tdm_extend(struct rsnd_dai_stream *io);
 int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io);
-int rsnd_runtime_is_ssi_mono(struct rsnd_dai_stream *io);
 
 /*
  * DT
@@ -435,6 +433,11 @@ int rsnd_runtime_is_ssi_mono(struct rsnd_dai_stream *io);
 #define RSND_NODE_CTU	"rcar_sound,ctu"
 #define RSND_NODE_MIX	"rcar_sound,mix"
 #define RSND_NODE_DVC	"rcar_sound,dvc"
+
+enum rsnd_tdm_mode_type {
+	TDM_MODE_BASIC,
+	TDM_MODE_EXTENDED,
+};
 
 /*
  *	R-Car sound DAI
@@ -681,20 +684,25 @@ int rsnd_kctrl_new(struct rsnd_mod *mod,
 				  struct rsnd_mod *mod),
 		   struct rsnd_kctrl_cfg *cfg,
 		   const char * const *texts,
+		   unsigned int index,
 		   int size,
 		   u32 max);
 
 #define rsnd_kctrl_new_m(mod, io, rtd, name, accept, update, cfg, size, max) \
 	rsnd_kctrl_new(mod, io, rtd, name, accept, update, rsnd_kctrl_init_m(cfg), \
-		       NULL, size, max)
+		       NULL, (rtd)->num, size, max)
 
 #define rsnd_kctrl_new_s(mod, io, rtd, name, accept, update, cfg, max)	\
 	rsnd_kctrl_new(mod, io, rtd, name, accept, update, rsnd_kctrl_init_s(cfg), \
-		       NULL, 1, max)
+		       NULL, (rtd)->num, 1, max)
 
 #define rsnd_kctrl_new_e(mod, io, rtd, name, accept, update, cfg, texts, size) \
 	rsnd_kctrl_new(mod, io, rtd, name, accept, update, rsnd_kctrl_init_s(cfg), \
-		       texts, 1, size)
+		       texts, (rtd)->num, 1, size)
+
+#define rsnd_kctrl_new_single_e(mod, io, rtd, name, accept, update, cfg, texts, size)	\
+	rsnd_kctrl_new(mod, io, rtd, name, accept, update, rsnd_kctrl_init_s(cfg), \
+		       texts, 0, 1, size)
 
 extern const char * const volume_ramp_rate[];
 #define VOLUME_RAMP_MAX_DVC	(0x17 + 1)
@@ -708,6 +716,7 @@ void rsnd_ssi_remove(struct rsnd_priv *priv);
 struct rsnd_mod *rsnd_ssi_mod_get(struct rsnd_priv *priv, int id);
 int rsnd_ssi_is_dma_mode(struct rsnd_mod *mod);
 int rsnd_ssi_use_busif(struct rsnd_dai_stream *io);
+int rsnd_ssi_tdm_mode(struct rsnd_dai_stream *io);
 u32 rsnd_ssi_multi_slaves_runtime(struct rsnd_dai_stream *io);
 
 #define RSND_SSI_HDMI_PORT0	0xf0

@@ -96,6 +96,11 @@
 
 #define SSI_NAME "ssi"
 
+static const char * const ssi_tdm_mode[] = {
+	"Basic",
+	"TDM Extended",
+};
+
 struct rsnd_ssi {
 	struct rsnd_mod mod;
 	struct rsnd_mod *dma;
@@ -115,6 +120,8 @@ struct rsnd_ssi {
 	int byte_pos;
 	int byte_per_period;
 	int next_period_byte;
+
+	struct rsnd_kctrl_cfg_s tdm_mode;
 };
 
 /* flags */
@@ -169,6 +176,14 @@ int rsnd_ssi_use_busif(struct rsnd_dai_stream *io)
 		use_busif = 1;
 
 	return use_busif;
+}
+
+int rsnd_ssi_tdm_mode(struct rsnd_dai_stream *io)
+{
+	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);
+	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
+
+	return ssi->tdm_mode.val;
 }
 
 static void rsnd_ssi_status_clear(struct rsnd_mod *mod)
@@ -437,11 +452,6 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 		cr_mode = DIEN;		/* PIO : enable Data interrupt */
 	}
 
-	/*
-	 * TDM Extend Mode
-	 * see
-	 *	rsnd_ssiu_init_gen2()
-	 */
 	wsr = ssi->wsr;
 
 	if (is_monaural) {
@@ -907,6 +917,33 @@ static int rsnd_ssi_pio_pointer(struct rsnd_mod *mod,
 	return 0;
 }
 
+#define MAX_MODE_SIZE 20
+
+static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
+			    struct rsnd_dai_stream *io,
+			    struct snd_soc_pcm_runtime *rtd)
+{
+	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
+	char mode[MAX_MODE_SIZE] = {0,};
+	int ret = 0;
+
+	if (rsnd_ssi_is_parent(mod, io))
+		return 0;
+
+	snprintf(mode, sizeof(mode), "SSI%d TDM Mode", mod->id);
+	if (!ssi->tdm_mode.cfg.io) {
+		ret = rsnd_kctrl_new_single_e(mod, io, rtd, mode,
+					      rsnd_kctrl_accept_anytime,
+					      NULL, &ssi->tdm_mode,
+					      ssi_tdm_mode,
+					      ARRAY_SIZE(ssi_tdm_mode));
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
 static struct rsnd_mod_ops rsnd_ssi_pio_ops = {
 	.name	= SSI_NAME,
 	.probe	= rsnd_ssi_common_probe,
@@ -919,6 +956,7 @@ static struct rsnd_mod_ops rsnd_ssi_pio_ops = {
 	.pointer = rsnd_ssi_pio_pointer,
 	.hw_params = rsnd_ssi_hw_params,
 	.set_fmt = rsnd_ssi_set_fmt,
+	.pcm_new = rsnd_ssi_pcm_new,
 };
 
 static int rsnd_ssi_dma_probe(struct rsnd_mod *mod,
@@ -995,6 +1033,7 @@ static struct rsnd_mod_ops rsnd_ssi_dma_ops = {
 	.fallback = rsnd_ssi_fallback,
 	.hw_params = rsnd_ssi_hw_params,
 	.set_fmt = rsnd_ssi_set_fmt,
+	.pcm_new = rsnd_ssi_pcm_new,
 };
 
 int rsnd_ssi_is_dma_mode(struct rsnd_mod *mod)
