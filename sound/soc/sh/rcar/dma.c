@@ -490,11 +490,15 @@ static struct rsnd_mod_ops rsnd_dmapp_ops = {
 #define RDMA_SSI_I_N(addr, i)	(addr ##_reg - 0x00300000 + (0x40 * i) + 0x8)
 #define RDMA_SSI_O_N(addr, i)	(addr ##_reg - 0x00300000 + (0x40 * i) + 0xc)
 
-#define RDMA_SSIU_I_N(addr, i)	(addr ##_reg - 0x00441000 + (0x1000 * i))
-#define RDMA_SSIU_O_N(addr, i)	(addr ##_reg - 0x00441000 + (0x1000 * i))
+#define RDMA_SSIU_I_N(addr, i, j) \
+		(addr ##_reg - 0x00441000 + (0x1000 \
+		* (i)) + (((j) / 4) * 0xA000) + (((j) % 4) * 0x400))
+#define RDMA_SSIU_O_N(addr, i, j) RDMA_SSIU_I_N(addr, i, j)
 
-#define RDMA_SSIU_I_P(addr, i)	(addr ##_reg - 0x00141000 + (0x1000 * i))
-#define RDMA_SSIU_O_P(addr, i)	(addr ##_reg - 0x00141000 + (0x1000 * i))
+#define RDMA_SSIU_I_P(addr, i, j) \
+			(addr ##_reg - 0x00141000 + (0x1000 \
+			* (i)) + (((j) / 4) * 0xA000) + (((j) % 4) * 0x400))
+#define RDMA_SSIU_O_P(addr, i, j) RDMA_SSIU_I_P(addr, i, j)
 
 #define RDMA_SRC_I_N(addr, i)	(addr ##_reg - 0x00500000 + (0x400 * i))
 #define RDMA_SRC_O_N(addr, i)	(addr ##_reg - 0x004fc000 + (0x400 * i))
@@ -520,6 +524,7 @@ rsnd_gen2_dma_addr(struct rsnd_dai_stream *io,
 		      !!rsnd_io_to_mod_mix(io) ||
 		      !!rsnd_io_to_mod_ctu(io);
 	int id = rsnd_mod_id(mod);
+	int busif = rsnd_ssi_get_busif(io);
 	struct dma_addr {
 		dma_addr_t out_addr;
 		dma_addr_t in_addr;
@@ -536,23 +541,23 @@ rsnd_gen2_dma_addr(struct rsnd_dai_stream *io,
 		},
 		/* SSI */
 		/* Capture */
-		{{{ RDMA_SSI_O_N(ssi, id),	0 },
-		  { RDMA_SSIU_O_P(ssi, id),	0 },
-		  { RDMA_SSIU_O_P(ssi, id),	0 } },
+		{{{ RDMA_SSI_O_N(ssi, id),		0 },
+		  { RDMA_SSIU_O_P(ssi, id, busif),	0 },
+		  { RDMA_SSIU_O_P(ssi, id, busif),	0 } },
 		 /* Playback */
-		 {{ 0,				RDMA_SSI_I_N(ssi, id) },
-		  { 0,				RDMA_SSIU_I_P(ssi, id) },
-		  { 0,				RDMA_SSIU_I_P(ssi, id) } }
+		 {{ 0,			RDMA_SSI_I_N(ssi, id) },
+		  { 0,			RDMA_SSIU_I_P(ssi, id, busif) },
+		  { 0,			RDMA_SSIU_I_P(ssi, id, busif) } }
 		},
 		/* SSIU */
 		/* Capture */
-		{{{ RDMA_SSIU_O_N(ssi, id),	0 },
-		  { RDMA_SSIU_O_P(ssi, id),	0 },
-		  { RDMA_SSIU_O_P(ssi, id),	0 } },
+		{{{ RDMA_SSIU_O_N(ssi, id, busif),	0 },
+		  { RDMA_SSIU_O_P(ssi, id, busif),	0 },
+		  { RDMA_SSIU_O_P(ssi, id, busif),	0 } },
 		 /* Playback */
-		 {{ 0,				RDMA_SSIU_I_N(ssi, id) },
-		  { 0,				RDMA_SSIU_I_P(ssi, id) },
-		  { 0,				RDMA_SSIU_I_P(ssi, id) } } },
+		 {{ 0,			RDMA_SSIU_I_N(ssi, id, busif) },
+		  { 0,			RDMA_SSIU_I_P(ssi, id, busif) },
+		  { 0,			RDMA_SSIU_I_P(ssi, id, busif) } } },
 	};
 
 	/* it shouldn't happen */
