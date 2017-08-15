@@ -485,6 +485,8 @@ struct rsnd_dai {
 	unsigned int frm_clk_inv:1;
 	unsigned int sys_delay:1;
 	unsigned int data_alignment:1;
+
+	struct rsnd_mod *dma[2];
 };
 
 #define rsnd_rdai_nr(priv) ((priv)->rdai_nr)
