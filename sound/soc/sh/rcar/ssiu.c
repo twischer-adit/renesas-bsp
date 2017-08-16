@@ -125,7 +125,7 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 {
 	int hdmi = rsnd_ssi_hdmi_port(io);
 	int ret;
-	u32 mode = 0;
+	u32 mode = 0, mode2 = 0;
 
 	ret = rsnd_ssiu_init(mod, io, priv);
 	if (ret < 0)
@@ -143,15 +143,22 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 	rsnd_mod_write(mod, SSI_MODE, mode);
 
 	if (rsnd_ssi_use_busif(io)) {
-		rsnd_mod_write(mod, SSI_BUSIF_ADINR,
-			       rsnd_get_adinr_bit(mod, io) |
-			       (rsnd_io_is_play(io) ?
+		int chnl = rsnd_io_is_play(io) ?
 				rsnd_runtime_channel_after_ctu(io) :
-				rsnd_runtime_channel_original(io)));
+				rsnd_runtime_channel_original(io);
+
+		rsnd_mod_write(mod, SSI_BUSIF_ADINR,
+			       rsnd_get_adinr_bit(mod, io) | chnl);
 		rsnd_mod_write(mod, SSI_BUSIF_MODE,
 			       rsnd_get_busif_shift(io, mod) | 1);
 		rsnd_mod_write(mod, SSI_BUSIF_DALIGN,
 			       rsnd_get_dalign(mod, io));
+
+		if (chnl == 16)
+			/* ex_func = 1 */
+			mode2 = 0x1;
+
+		rsnd_mod_write(mod, SSI_0_MODE2, mode2);
 	}
 
 	if (hdmi) {

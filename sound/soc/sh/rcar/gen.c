@@ -229,6 +229,7 @@ static int rsnd_gen2_probe(struct rsnd_priv *priv)
 		RSND_GEN_M_REG(SSI_MODE,	0xc,	0x80),
 		RSND_GEN_M_REG(SSI_CTRL,	0x10,	0x80),
 		RSND_GEN_M_REG(SSI_INT_ENABLE,	0x18,	0x80),
+		RSND_GEN_M_REG(SSI_0_MODE2,	0xa0c,	0x20),
 	};
 
 	static const struct rsnd_regmap_field_conf conf_scu[] = {
@@ -345,6 +346,7 @@ static int rsnd_gen2_probe(struct rsnd_priv *priv)
 		RSND_GEN_M_REG(SSITDR,		0x08,	0x40),
 		RSND_GEN_M_REG(SSIRDR,		0x0c,	0x40),
 		RSND_GEN_M_REG(SSIWSR,		0x20,	0x40),
+		RSND_GEN_M_REG(SSICRE,		0x30,	0x40),
 	};
 	int ret_ssiu;
 	int ret_scu;

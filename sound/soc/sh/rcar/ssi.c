@@ -37,6 +37,7 @@
 #define	CHNL_4		(1 << 22)	/* Channels */
 #define	CHNL_6		(2 << 22)	/* Channels */
 #define	CHNL_8		(3 << 22)	/* Channels */
+#define	CHNL_16		(0 << 22)	/* Channels (16ch Mode) */
 #define	DWL_8		(0 << 19)	/* Data Word Length */
 #define	DWL_16		(1 << 19)	/* Data Word Length */
 #define	DWL_18		(2 << 19)	/* Data Word Length */
@@ -44,6 +45,11 @@
 #define	DWL_22		(4 << 19)	/* Data Word Length */
 #define	DWL_24		(5 << 19)	/* Data Word Length */
 #define	DWL_32		(6 << 19)	/* Data Word Length */
+
+/*
+ * SSICRE
+ */
+#define	CHNL2		(1 << 0)	/* Extension bit of SSICR.CHNL */
 
 /*
  * System word length
@@ -110,6 +116,7 @@ struct rsnd_ssi {
 	u32 cr_clk;
 	u32 cr_mode;
 	u32 cr_en;
+	u32 cre;
 	u32 wsr;
 	int chan;
 	int rate;
@@ -408,10 +415,12 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
 	u32 cr_own;
 	u32 cr_mode;
+	u32 cre;
 	u32 wsr;
 	u32 swl;
 	int chnl;
 	int is_tdm;
+	int is_tdm16;
 	int is_monaural;
 
 	if (rsnd_ssi_is_parent(mod, io))
@@ -420,6 +429,7 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	chnl = rsnd_runtime_channel_for_ssi(io);
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
 	is_monaural = rsnd_runtime_is_ssi_monaural(io);
+	is_tdm16 = is_tdm && (chnl == 16);
 
 	swl = rsnd_get_swl(rdai, is_monaural);
 
@@ -453,6 +463,7 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	}
 
 	wsr = ssi->wsr;
+	cre = ssi->cre;
 
 	if (is_monaural) {
 		wsr |= WS_MODE;
@@ -473,10 +484,14 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 			cr_own |= CHNL_8;
 			break;
 		}
+
+		if (is_tdm16)
+			cre |= CHNL2;
 	}
 
 	ssi->cr_own	= cr_own;
 	ssi->cr_mode	= cr_mode;
+	ssi->cre	= cre;
 	ssi->wsr	= wsr;
 }
 
@@ -489,6 +504,7 @@ static void rsnd_ssi_register_setup(struct rsnd_mod *mod)
 					ssi->cr_clk	|
 					ssi->cr_mode	|
 					ssi->cr_en);
+	rsnd_mod_write(mod, SSICRE,	ssi->cre);
 }
 
 /*
@@ -538,8 +554,10 @@ static int rsnd_ssi_quit(struct rsnd_mod *mod,
 		return -EIO;
 	}
 
-	if (!rsnd_ssi_is_parent(mod, io))
+	if (!rsnd_ssi_is_parent(mod, io)) {
 		ssi->cr_own	= 0;
+		ssi->cre	= 0;
+	}
 
 	rsnd_ssi_master_clk_stop(mod, io);
 
