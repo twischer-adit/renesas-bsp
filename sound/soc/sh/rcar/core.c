@@ -106,7 +106,9 @@
 #include "rsnd.h"
 
 #define RSND_RATES SNDRV_PCM_RATE_8000_192000
-#define RSND_FMTS (SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S16_LE)
+#define RSND_FMTS (SNDRV_PCM_FMTBIT_S8 |\
+		   SNDRV_PCM_FMTBIT_S24_LE |\
+		   SNDRV_PCM_FMTBIT_S16_LE)
 
 #define RSND_DEFAULT_SLOT_WIDTH	32
 
@@ -295,6 +297,8 @@ u32 rsnd_get_adinr_bit(struct rsnd_mod *mod, struct rsnd_dai_stream *io)
 	struct device *dev = rsnd_priv_to_dev(priv);
 
 	switch (snd_pcm_format_width(runtime->format)) {
+	case 8:
+		return 16 << 16;
 	case 16:
 		return 8 << 16;
 	case 24:
@@ -346,7 +350,7 @@ u32 rsnd_get_dalign(struct rsnd_mod *mod, struct rsnd_dai_stream *io)
 		target = cmd ? cmd : ssiu;
 	}
 
-	/* Non target mod or 24bit data needs normal DALIGN */
+	/* Non target mod or 8bit & 24bit data needs normal DALIGN */
 	if ((snd_pcm_format_width(runtime->format) != 16) ||
 	    (mod != target))
 		return 0x76543210;
@@ -382,7 +386,8 @@ u32 rsnd_get_busif_shift(struct rsnd_dai_stream *io, struct rsnd_mod *mod)
 	 * HW    24bit data is located as 0x******00
 	 *
 	 */
-	if (snd_pcm_format_width(runtime->format) == 16)
+	if (snd_pcm_format_width(runtime->format) == 8 ||
+	    snd_pcm_format_width(runtime->format) == 16)
 		return 0;
 
 	for (i = 0; i < ARRAY_SIZE(playback_mods); i++) {
