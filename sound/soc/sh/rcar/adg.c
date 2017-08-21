@@ -24,6 +24,11 @@
 
 #define BRRx_MASK(x) (0x3FF & x)
 
+#define AVB_CLK_NAME_SIZE	10
+#define AVB_CLK_NAME		"avb"
+#define AVB_CLK_NUM		8
+#define AVB_ID_TO_SEL(id)	(((id) % 4) * 0x40 + ((id) / 4) * 8 + 0x30)
+
 static struct rsnd_mod_ops adg_ops = {
 	.name = "adg",
 };
@@ -31,6 +36,7 @@ static struct rsnd_mod_ops adg_ops = {
 struct rsnd_adg {
 	struct clk *clk[CLKMAX];
 	struct clk *clkout[CLKOUTMAX];
+	struct clk *clk_avb[AVB_CLK_NUM];
 	struct clk_onecell_data onecell;
 	struct rsnd_mod mod;
 	u32 flags;
@@ -38,6 +44,7 @@ struct rsnd_adg {
 	u32 rbga;
 	u32 rbgb;
 
+	unsigned int avb_data[AVB_CLK_NUM];
 	int rbga_rate_for_441khz; /* RBGA */
 	int rbgb_rate_for_48khz;  /* RBGB */
 };
@@ -604,11 +611,32 @@ int rsnd_adg_probe(struct rsnd_priv *priv)
 {
 	struct rsnd_adg *adg;
 	struct device *dev = rsnd_priv_to_dev(priv);
-	int ret;
+	int ret, i, j = 0;
 
 	adg = devm_kzalloc(dev, sizeof(*adg), GFP_KERNEL);
 	if (!adg)
 		return -ENOMEM;
+
+	for (i = 0; i < AVB_CLK_NUM; i++) {
+		char name[AVB_CLK_NAME_SIZE];
+		struct clk *clk;
+
+		snprintf(name, AVB_CLK_NAME_SIZE, "%s.%d", AVB_CLK_NAME, i);
+
+		clk = devm_clk_get(dev, name);
+		if (IS_ERR(clk))
+			continue;
+
+		if (clk_prepare(clk)) {
+			dev_warn(dev, "Failed to prepare %s clock\n", name);
+			continue;
+		}
+
+		dev_dbg(dev, "clk_avb[%d] assigned with %s clock\n", j, name);
+
+		adg->clk_avb[j] = clk;
+		adg->avb_data[j++] = AVB_ID_TO_SEL(i);
+	}
 
 	ret = rsnd_mod_init(priv, &adg->mod, &adg_ops,
 		      NULL, NULL, 0, 0);
@@ -637,6 +665,9 @@ void rsnd_adg_remove(struct rsnd_priv *priv)
 	for_each_rsnd_clkout(clk, adg, i)
 		if (adg->clkout[i])
 			clk_unregister_fixed_rate(adg->clkout[i]);
+
+	for (i = 0; i < AVB_CLK_NUM; i++)
+		clk_unprepare(adg->clk_avb[i]);
 
 	of_clk_del_provider(np);
 
