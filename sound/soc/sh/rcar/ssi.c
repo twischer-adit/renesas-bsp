@@ -194,6 +194,19 @@ int rsnd_ssi_get_busif(struct rsnd_dai_stream *io)
 	return rdai->busif[is_play].val;
 }
 
+static u32 rsnd_ssi_multi_slaves(struct rsnd_dai_stream *io);
+static void rsnd_ssi_set_busif(struct rsnd_dai_stream *io,
+			       struct rsnd_mod *mod)
+{
+	int is_play = rsnd_io_is_play(io);
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+
+	if (rsnd_ssi_is_multi_slave(mod, io))
+		return;
+
+	rsnd_dma_addr_update(io, mod, rdai->dma[is_play]);
+}
+
 int rsnd_ssi_tdm_mode(struct rsnd_dai_stream *io)
 {
 	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);
@@ -953,13 +966,16 @@ static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
 			    struct snd_soc_pcm_runtime *rtd)
 {
 	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	int is_play = rsnd_io_is_play(io);
+	int id = rsnd_mod_id(mod);
 	char mode[MAX_MODE_SIZE] = {0,};
 	int ret = 0;
 
 	if (rsnd_ssi_is_parent(mod, io))
 		return 0;
 
-	snprintf(mode, sizeof(mode), "SSI%d TDM Mode", mod->id);
+	snprintf(mode, sizeof(mode), "SSI%d TDM Mode", id);
 	if (!ssi->tdm_mode.cfg.io) {
 		ret = rsnd_kctrl_new_single_e(mod, io, rtd, mode,
 					      rsnd_kctrl_accept_anytime,
@@ -970,6 +986,25 @@ static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
 			return ret;
 	}
 
+	/* kctrls for dma mode */
+	if (!rsnd_ssi_is_dma_mode(mod))
+		return 0;
+
+	if (!rsnd_ssi_use_busif(io))
+		return 0;
+
+	if (rsnd_ssi_is_multi_slave(mod, io))
+		return 0;
+
+	/* SSI5 to SSI8 only have one BUSIF */
+	if (id <= 4 || id == 9)
+		ret = rsnd_kctrl_new_s(mod, io, rtd,
+				       is_play ?
+				       "SSI Out BUSIF" :
+				       "SSI In BUSIF",
+				       rsnd_kctrl_accept_anytime,
+				       rsnd_ssi_set_busif,
+				       &rdai->busif[is_play], 7);
 	return ret;
 }
 

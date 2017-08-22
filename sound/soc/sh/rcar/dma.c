@@ -784,6 +784,38 @@ int rsnd_dma_attach(struct rsnd_dai_stream *io, struct rsnd_mod *mod,
 	return rsnd_dai_connect(*dma_mod, io, (*dma_mod)->type);
 }
 
+void rsnd_dma_addr_update(struct rsnd_dai_stream *io,
+			  struct rsnd_mod *mod,
+			  struct rsnd_mod *dma_mod)
+{
+	struct rsnd_mod *mod_from = NULL;
+	struct rsnd_mod *mod_to = NULL;
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct rsnd_dma_ctrl *dmac = rsnd_priv_to_dmac(priv);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	int is_play = rsnd_io_is_play(io);
+	struct rsnd_dma *dma = rsnd_mod_to_dma(dma_mod);
+
+	if (!dmac)
+		return;
+
+	rsnd_dma_of_path(mod, io, is_play, &mod_from, &mod_to);
+
+	dma->src_addr = rsnd_dma_addr(io, mod_from, is_play, 1);
+	dma->dst_addr = rsnd_dma_addr(io, mod_to,   is_play, 0);
+
+	if (mod_from && mod_to) {
+		struct rsnd_dmapp *dmapp = rsnd_dma_to_dmapp(dma);
+
+		dmapp->chcr = rsnd_dmapp_get_chcr(io, mod_from, mod_to) |
+						  PDMACHCR_DE;
+	}
+
+	dev_dbg(dev, "%s[%d] %pad -> %pad\n",
+		rsnd_mod_name(mod), rsnd_mod_id(mod),
+		&dma->src_addr, &dma->dst_addr);
+}
+
 int rsnd_dma_probe(struct rsnd_priv *priv)
 {
 	struct platform_device *pdev = rsnd_priv_to_pdev(priv);
