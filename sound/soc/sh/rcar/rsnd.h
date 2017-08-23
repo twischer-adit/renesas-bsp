@@ -159,9 +159,30 @@ enum rsnd_reg {
 	RSND_REG_SSI_MODE2,
 	RSND_REG_SSI_CONTROL,
 	RSND_REG_SSI_CTRL,
-	RSND_REG_SSI_BUSIF_MODE,
-	RSND_REG_SSI_BUSIF_ADINR,
-	RSND_REG_SSI_BUSIF_DALIGN,
+	RSND_REG_SSI_BUSIF0_MODE,
+	RSND_REG_SSI_BUSIF0_ADINR,
+	RSND_REG_SSI_BUSIF0_DALIGN,
+	RSND_REG_SSI_BUSIF1_MODE,
+	RSND_REG_SSI_BUSIF1_ADINR,
+	RSND_REG_SSI_BUSIF1_DALIGN,
+	RSND_REG_SSI_BUSIF2_MODE,
+	RSND_REG_SSI_BUSIF2_ADINR,
+	RSND_REG_SSI_BUSIF2_DALIGN,
+	RSND_REG_SSI_BUSIF3_MODE,
+	RSND_REG_SSI_BUSIF3_ADINR,
+	RSND_REG_SSI_BUSIF3_DALIGN,
+	RSND_REG_SSI_BUSIF4_MODE,
+	RSND_REG_SSI_BUSIF4_ADINR,
+	RSND_REG_SSI_BUSIF4_DALIGN,
+	RSND_REG_SSI_BUSIF5_MODE,
+	RSND_REG_SSI_BUSIF5_ADINR,
+	RSND_REG_SSI_BUSIF5_DALIGN,
+	RSND_REG_SSI_BUSIF6_MODE,
+	RSND_REG_SSI_BUSIF6_ADINR,
+	RSND_REG_SSI_BUSIF6_DALIGN,
+	RSND_REG_SSI_BUSIF7_MODE,
+	RSND_REG_SSI_BUSIF7_ADINR,
+	RSND_REG_SSI_BUSIF7_DALIGN,
 	RSND_REG_SSI_INT_ENABLE,
 	RSND_REG_SSI_SYS_STATUS0,
 	RSND_REG_SSI_SYS_STATUS1,
@@ -467,6 +488,16 @@ struct rsnd_dai_stream {
 #define rsnd_io_is_play(io)	(&rsnd_io_to_rdai(io)->playback == io)
 #define rsnd_io_to_runtime(io) ((io)->substream ? \
 				(io)->substream->runtime : NULL)
+#define RSND_MOD_WRITE_BUSIF(i)					\
+({								\
+	rsnd_mod_write(mod, SSI_BUSIF##i##_ADINR,		\
+		       rsnd_get_adinr_bit(mod, io) | chnl);	\
+	rsnd_mod_write(mod, SSI_BUSIF##i##_MODE,		\
+		       rsnd_get_busif_shift(io, mod) | 1);	\
+	rsnd_mod_write(mod, SSI_BUSIF##i##_DALIGN,		\
+		       rsnd_get_dalign(mod, io));		\
+})
+
 int rsnd_io_is_working(struct rsnd_dai_stream *io);
 
 #define rsnd_rdai_nr(priv) ((priv)->rdai_nr)

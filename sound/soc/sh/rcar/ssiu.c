@@ -146,13 +146,34 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 		int chnl = rsnd_io_is_play(io) ?
 				rsnd_runtime_channel_after_ctu(io) :
 				rsnd_runtime_channel_original(io);
+		int busif = rsnd_ssi_get_busif(io);
 
-		rsnd_mod_write(mod, SSI_BUSIF_ADINR,
-			       rsnd_get_adinr_bit(mod, io) | chnl);
-		rsnd_mod_write(mod, SSI_BUSIF_MODE,
-			       rsnd_get_busif_shift(io, mod) | 1);
-		rsnd_mod_write(mod, SSI_BUSIF_DALIGN,
-			       rsnd_get_dalign(mod, io));
+		switch (busif) {
+		case 0:
+			RSND_MOD_WRITE_BUSIF(0);
+			break;
+		case 1:
+			RSND_MOD_WRITE_BUSIF(1);
+			break;
+		case 2:
+			RSND_MOD_WRITE_BUSIF(2);
+			break;
+		case 3:
+			RSND_MOD_WRITE_BUSIF(3);
+			break;
+		case 4:
+			RSND_MOD_WRITE_BUSIF(4);
+			break;
+		case 5:
+			RSND_MOD_WRITE_BUSIF(5);
+			break;
+		case 6:
+			RSND_MOD_WRITE_BUSIF(6);
+			break;
+		case 7:
+			RSND_MOD_WRITE_BUSIF(7);
+			break;
+		}
 
 		if (chnl == 16)
 			/* ex_func = 1 */
@@ -204,10 +225,12 @@ static int rsnd_ssiu_start_gen2(struct rsnd_mod *mod,
 				struct rsnd_dai_stream *io,
 				struct rsnd_priv *priv)
 {
+	int busif = rsnd_ssi_get_busif(io);
+
 	if (!rsnd_ssi_use_busif(io))
 		return 0;
 
-	rsnd_mod_write(mod, SSI_CTRL, 0x1);
+	rsnd_mod_bset(mod, SSI_CTRL, 1 << (busif * 4), 1 << (busif * 4));
 
 	if (rsnd_ssi_multi_slaves_runtime(io))
 		rsnd_mod_write(mod, SSI_CONTROL, 0x1);
@@ -219,10 +242,12 @@ static int rsnd_ssiu_stop_gen2(struct rsnd_mod *mod,
 			       struct rsnd_dai_stream *io,
 			       struct rsnd_priv *priv)
 {
+	int busif = rsnd_ssi_get_busif(io);
+
 	if (!rsnd_ssi_use_busif(io))
 		return 0;
 
-	rsnd_mod_write(mod, SSI_CTRL, 0);
+	rsnd_mod_bset(mod, SSI_CTRL, 1 << (busif * 4), 0);
 
 	if (rsnd_ssi_multi_slaves_runtime(io))
 		rsnd_mod_write(mod, SSI_CONTROL, 0);
