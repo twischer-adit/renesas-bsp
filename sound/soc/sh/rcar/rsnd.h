@@ -513,6 +513,8 @@ int rsnd_io_is_working(struct rsnd_dai_stream *io);
 
 #define rsnd_rdai_nr(priv) ((priv)->rdai_nr)
 #define rsnd_rdai_is_clk_master(rdai) ((rdai)->clk_master)
+#define rsnd_rdai_slot_width_get(rdai) ((rdai)->slot_width)
+#define rsnd_rdai_slots_get(rdai) ((rdai)->slots)
 #define rsnd_rdai_to_priv(rdai) ((rdai)->priv)
 #define for_each_rsnd_dai(rdai, priv, i)		\
 	for (i = 0;					\

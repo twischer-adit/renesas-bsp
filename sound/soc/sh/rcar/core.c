@@ -111,6 +111,7 @@
 		   SNDRV_PCM_FMTBIT_S16_LE)
 
 #define RSND_DEFAULT_SLOT_WIDTH	32
+#define RSND_EXTMOD_CHAN_SLOT_SUM	14
 
 static const struct of_device_id rsnd_of_match[] = {
 	{ .compatible = "renesas,rcar_sound-gen1", .data = (void *)RSND_GEN1 },
@@ -797,24 +798,138 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	return 0;
 }
 
-static unsigned int rsnd_soc_hw_channels_list[] = {
-	2, 6, 8,
+static int rsnd_soc_hw_rule_format(struct snd_pcm_hw_params *params,
+				   struct snd_pcm_hw_rule *rule)
+{
+	struct snd_mask *maskp = hw_param_mask(params, rule->var);
+	struct rsnd_dai_stream *io = rule->private;
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	struct snd_mask format;
+	int slot_width = rsnd_rdai_slot_width_get(rdai);
+	int slots = rsnd_rdai_channels_get(rdai);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+
+	snd_mask_none(&format);
+
+	/* System Word Length related constraints */
+	switch (slot_width) {
+	case 32:
+	case 24:
+		snd_mask_set(&format,
+			     (__force unsigned int)SNDRV_PCM_FORMAT_S24_LE);
+	case 16:
+		snd_mask_set(&format,
+			     (__force unsigned int)SNDRV_PCM_FORMAT_S16_LE);
+	case 8:
+		snd_mask_set(&format,
+			     (__force unsigned int)SNDRV_PCM_FORMAT_S8);
+		break;
+	}
+
+	/* System slots related constraints */
+	switch (slots) {
+	case 1:
+	case 16:
+		snd_mask_reset(&format,
+			       (__force unsigned int)SNDRV_PCM_FORMAT_S24_LE);
+		break;
+	}
+
+	/* SSI Mode related constraints */
+	switch (tdm_mode) {
+	case TDM_MODE_EXTENDED:
+	case TDM_MODE_SPLIT:
+		snd_mask_reset(&format,
+			       (__force unsigned int)SNDRV_PCM_FORMAT_S8);
+		break;
+	}
+
+	return snd_mask_refine(maskp, &format);
+}
+
+static unsigned int rsnd_soc_hw_channels_basic_list[] = {
+	1, 2, 4, 6, 8, 16,
+};
+
+static unsigned int rsnd_soc_hw_channels_basic_src_list[] = {
+	1, 2, 4, 6, 8,
+};
+
+static unsigned int rsnd_soc_hw_channels_extend_list[] = {
+	6, 8,
 };
 
 static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 				     struct snd_pcm_hw_rule *rule)
 {
-	struct snd_interval *ic_ = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *ic_ = hw_param_interval(params,
+				SNDRV_PCM_HW_PARAM_CHANNELS);
 	struct snd_interval ic;
 	struct rsnd_dai_stream *io = rule->private;
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+	int slots = rsnd_rdai_channels_get(rdai);
 
 	snd_interval_any(&ic);
 
-	ic = *ic_;
-	ic.min =
-	ic.max = rsnd_runtime_channel_for_ssi_with_params(io, params);
+	switch (tdm_mode) {
+	case TDM_MODE_BASIC:
+		ic.min = slots;
+		ic.max = slots;
+		break;
+	case TDM_MODE_EXTENDED:
+		ic.min = RSND_EXTMOD_CHAN_SLOT_SUM - slots;
+		ic.max = RSND_EXTMOD_CHAN_SLOT_SUM - slots;
+		break;
+	}
+
+	ic.integer = 1;
 
 	return snd_interval_refine(ic_, &ic);
+}
+
+static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
+				   struct rsnd_dai_stream *io)
+{
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	struct snd_pcm_hw_constraint_list *constraint = &rdai->constraint;
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+	struct rsnd_mod *src = rsnd_io_to_mod_src(io);
+
+	/* Channel list constraints */
+	switch (tdm_mode) {
+	case TDM_MODE_BASIC:
+		if (src) {
+			constraint->list = rsnd_soc_hw_channels_basic_src_list;
+			constraint->count =
+				ARRAY_SIZE(rsnd_soc_hw_channels_basic_src_list);
+		} else {
+			constraint->list = rsnd_soc_hw_channels_basic_list;
+			constraint->count =
+				ARRAY_SIZE(rsnd_soc_hw_channels_basic_list);
+		}
+		break;
+	case TDM_MODE_EXTENDED:
+		constraint->list = rsnd_soc_hw_channels_extend_list;
+		constraint->count =
+			ARRAY_SIZE(rsnd_soc_hw_channels_extend_list);
+		break;
+	}
+
+	constraint->mask = 0;
+
+	snd_pcm_hw_constraint_list(runtime, 0,
+				   SNDRV_PCM_HW_PARAM_CHANNELS, constraint);
+
+	/* More Channel constraints */
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+			    rsnd_soc_hw_rule_channels, io,
+			    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+
+	/* Format constraints */
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_FORMAT,
+			    rsnd_soc_hw_rule_format, io,
+			    SNDRV_PCM_HW_PARAM_FORMAT, -1);
 }
 
 static const struct snd_pcm_hardware rsnd_pcm_hardware = {
@@ -835,32 +950,19 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
 	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
 	struct rsnd_dai_stream *io = rsnd_rdai_to_io(rdai, substream);
-	struct snd_pcm_hw_constraint_list *constraint = &rdai->constraint;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int ret;
+	struct rsnd_mod *ssi_mod = rsnd_io_to_mod_ssi(io);
 
 	rsnd_dai_stream_init(io, substream);
 
-	/*
-	 * Channel Limitation
-	 * It depends on Platform design
-	 */
-	constraint->list	= rsnd_soc_hw_channels_list;
-	constraint->count	= ARRAY_SIZE(rsnd_soc_hw_channels_list);
-	constraint->mask	= 0;
-
 	snd_soc_set_runtime_hwparams(substream, &rsnd_pcm_hardware);
-
-	snd_pcm_hw_constraint_list(runtime, 0,
-				   SNDRV_PCM_HW_PARAM_CHANNELS, constraint);
 
 	snd_pcm_hw_constraint_integer(runtime,
 				      SNDRV_PCM_HW_PARAM_PERIODS);
 
-	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-			    rsnd_soc_hw_rule_channels,
-			    dai,
-			    SNDRV_PCM_HW_PARAM_RATE, -1);
+	if (ssi_mod)
+		rsnd_soc_hw_constraint(substream->runtime, io);
 
 	/*
 	 * call rsnd_dai_call without spinlock
