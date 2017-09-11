@@ -859,6 +859,56 @@ static unsigned int rsnd_soc_hw_channels_extend_list[] = {
 	6, 8,
 };
 
+static unsigned int rsnd_soc_hw_channels_split_list[] = {
+	1, 2,
+};
+
+static unsigned int rsnd_soc_hw_channels_exsplit_src_list[] = {
+	2, 4, 6, 8,
+};
+
+static unsigned int rsnd_soc_hw_channels_exsplit_list[] = {
+	2, 4, 6, 8, 10,
+};
+
+static int rsnd_exsplit_max_channel(int busif, int slots)
+{
+	int max_chan = 0;
+
+	switch (busif) {
+	case 0:
+		if (slots == 16)
+			max_chan = 10;
+		else
+			max_chan = 6;
+		break;
+	case 2:
+		max_chan = 4;
+		break;
+	case 5:
+	case 7:
+		if (slots == 16)
+			max_chan = 2;
+		break;
+	case 1:
+	case 3:
+		max_chan = 2;
+		break;
+	case 4:
+		if (slots == 16)
+			max_chan = 8;
+		break;
+	case 6:
+		if (slots == 16)
+			max_chan = 4;
+		break;
+	default:
+		break;
+	}
+
+	return max_chan;
+}
+
 static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 				     struct snd_pcm_hw_rule *rule)
 {
@@ -869,6 +919,10 @@ static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
 	int tdm_mode = rsnd_ssi_tdm_mode(io);
 	int slots = rsnd_rdai_channels_get(rdai);
+	int busif = rsnd_ssi_get_busif(io);
+	int chnl;
+	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
+	struct device *dev = rsnd_priv_to_dev(priv);
 
 	snd_interval_any(&ic);
 
@@ -881,11 +935,42 @@ static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 		ic.min = RSND_EXTMOD_CHAN_SLOT_SUM - slots;
 		ic.max = RSND_EXTMOD_CHAN_SLOT_SUM - slots;
 		break;
+	case TDM_MODE_SPLIT:
+		if (slots != 4 && slots != 8)
+			goto error;
+
+		if (busif > 3) {
+			dev_err(dev, "Invalid busif %d\n", busif);
+			return -EINVAL;
+		}
+
+		ic.min = slots / 4;
+		ic.max = slots / 4;
+		break;
+	case TDM_MODE_EXSPLIT:
+		if (slots != 8 && slots != 16)
+			goto error;
+
+		chnl = rsnd_exsplit_max_channel(busif, slots);
+		if (chnl == 0) {
+			dev_err(dev, "Invalid busif %d with slots %d\n",
+				busif, slots);
+			return -EINVAL;
+		}
+
+		ic.min = 2;
+		ic.max = chnl;
+
+		break;
 	}
 
 	ic.integer = 1;
 
 	return snd_interval_refine(ic_, &ic);
+
+error:
+	dev_err(dev, "Invalid slot number %d\n", slots);
+	return -EINVAL;
 }
 
 static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
@@ -913,6 +998,25 @@ static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
 		constraint->list = rsnd_soc_hw_channels_extend_list;
 		constraint->count =
 			ARRAY_SIZE(rsnd_soc_hw_channels_extend_list);
+		break;
+	case TDM_MODE_SPLIT:
+		constraint->list = rsnd_soc_hw_channels_split_list;
+		constraint->count =
+			ARRAY_SIZE(rsnd_soc_hw_channels_split_list);
+		break;
+	case TDM_MODE_EXSPLIT:
+		if  (src) {
+			constraint->list =
+				rsnd_soc_hw_channels_exsplit_src_list;
+			constraint->count =
+				ARRAY_SIZE(
+					rsnd_soc_hw_channels_exsplit_src_list);
+		} else {
+			constraint->list =
+				rsnd_soc_hw_channels_exsplit_list;
+			constraint->count =
+				ARRAY_SIZE(rsnd_soc_hw_channels_exsplit_list);
+		}
 		break;
 	}
 
