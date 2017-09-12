@@ -422,9 +422,6 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	int is_tdm16;
 	int is_monaural;
 
-	if (rsnd_ssi_is_parent(mod, io))
-		return;
-
 	chnl = rsnd_runtime_channel_for_ssi(io);
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
 	is_monaural = rsnd_runtime_is_ssi_monaural(io);
@@ -491,8 +488,10 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 			cre |= CHNL2;
 	}
 
-	ssi->cr_own	= cr_own;
-	ssi->cr_mode	= cr_mode;
+	if (!ssi->cr_own || !rsnd_ssi_is_parent(mod, io))
+		ssi->cr_own = cr_own;
+	if (!rsnd_ssi_is_parent(mod, io))
+		ssi->cr_mode = cr_mode;
 	ssi->cre	= cre;
 	ssi->wsr	= wsr;
 }
@@ -556,16 +555,16 @@ static int rsnd_ssi_quit(struct rsnd_mod *mod,
 		return -EIO;
 	}
 
-	if (!rsnd_ssi_is_parent(mod, io)) {
-		ssi->cr_own	= 0;
-		ssi->cre	= 0;
-	}
-
 	rsnd_ssi_master_clk_stop(mod, io);
 
 	rsnd_mod_power_off(mod);
 
 	ssi->usrcnt--;
+
+	if (!ssi->usrcnt) {
+		ssi->cr_own = 0;
+		ssi->cre = 0;
+	}
 
 	return 0;
 }
