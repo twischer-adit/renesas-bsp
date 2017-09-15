@@ -267,6 +267,15 @@ static int rsnd_ctu_hw_params(struct rsnd_mod *mod,
 				ctu->channels = params_channels(be_params);
 		}
 
+		if (ctu->channels) {
+			int ret;
+
+			ret = rsnd_soc_ctu_channel_is_valid(io, fe_params,
+							    ctu->channels);
+			if (!ret)
+				return -EINVAL;
+		}
+
 		dev_dbg(dev, "CTU convert channels %d\n", ctu->channels);
 	}
 

@@ -909,6 +909,94 @@ static int rsnd_exsplit_max_channel(int busif, int slots)
 	return max_chan;
 }
 
+int rsnd_soc_ctu_channel_is_valid(struct rsnd_dai_stream *io,
+				  struct snd_pcm_hw_params *params,
+				  int channel)
+{
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	int slots = rsnd_rdai_slots_get(rdai);
+	int busif = rsnd_ssi_get_busif(io);
+	int *list = NULL;
+	int size = 0, i;
+	int is_play = rsnd_io_is_play(io);
+
+	if (is_play) {
+		int max_chnl;
+
+		switch (tdm_mode) {
+		case TDM_MODE_BASIC:
+			if (channel != slots) {
+				dev_err(dev, "Invalid channel %d with slots %d\n",
+					channel, slots);
+				return 0;
+			}
+
+			list = rsnd_soc_hw_channels_basic_src_list;
+			size = ARRAY_SIZE(rsnd_soc_hw_channels_basic_src_list);
+			break;
+		case TDM_MODE_EXTENDED:
+			if (channel + slots != RSND_EXTMOD_CHAN_SLOT_SUM) {
+				dev_err(dev, "Invalid channel %d with slots %d\n",
+					channel, slots);
+				return 0;
+			}
+
+			list = rsnd_soc_hw_channels_extend_list;
+			size = ARRAY_SIZE(rsnd_soc_hw_channels_extend_list);
+			break;
+		case TDM_MODE_SPLIT:
+			if (channel != slots / 4) {
+				dev_err(dev, "Channel number %d is not valid\n",
+					channel);
+				return 0;
+			}
+
+			list = rsnd_soc_hw_channels_split_list;
+			size = ARRAY_SIZE(rsnd_soc_hw_channels_split_list);
+			break;
+		case TDM_MODE_EXSPLIT:
+			max_chnl = rsnd_exsplit_max_channel(busif, slots);
+			if (max_chnl == 0) {
+				dev_err(dev, "Invalid busif %d with slots %d\n",
+					busif, slots);
+				return 0;
+			}
+
+			if (channel > max_chnl) {
+				dev_err(dev, "Channel number %d is not valid\n",
+					channel);
+				return 0;
+			}
+
+			list = rsnd_soc_hw_channels_exsplit_src_list;
+			size = ARRAY_SIZE(
+				rsnd_soc_hw_channels_exsplit_src_list);
+			break;
+		default:
+			dev_warn(dev, "Invalid mode %d\n", tdm_mode);
+			return 0;
+		}
+	} else {
+		list = rsnd_soc_hw_channels_basic_src_list;
+		size = ARRAY_SIZE(rsnd_soc_hw_channels_basic_src_list);
+	}
+
+	for (i = 0; i < size; i++) {
+		if (channel == list[i])
+			break;
+	}
+
+	if (i == size) {
+		dev_err(dev, "Channel number %d is not valid\n", channel);
+		return 0;
+	}
+
+	return 1;
+}
+
 static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 				     struct snd_pcm_hw_rule *rule)
 {
