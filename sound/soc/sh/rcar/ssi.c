@@ -184,6 +184,14 @@ int rsnd_ssi_use_busif(struct rsnd_dai_stream *io)
 	return use_busif;
 }
 
+int rsnd_ssi_get_busif(struct rsnd_dai_stream *io)
+{
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	int is_play = rsnd_io_is_play(io);
+
+	return rdai->busif[is_play].val;
+}
+
 int rsnd_ssi_tdm_mode(struct rsnd_dai_stream *io)
 {
 	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);

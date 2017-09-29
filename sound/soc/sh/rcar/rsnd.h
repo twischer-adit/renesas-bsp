@@ -469,26 +469,6 @@ struct rsnd_dai_stream {
 				(io)->substream->runtime : NULL)
 int rsnd_io_is_working(struct rsnd_dai_stream *io);
 
-struct rsnd_dai {
-	char name[RSND_DAI_NAME_SIZE];
-	struct rsnd_dai_stream playback;
-	struct rsnd_dai_stream capture;
-	struct rsnd_priv *priv;
-	struct snd_pcm_hw_constraint_list constraint;
-
-	int slots;		/* 1ch - 16ch */
-	int ssi_lane;		/* 1lane - 4lane */
-	int slot_width;		/* 16,24,32bits */
-
-	unsigned int clk_master:1;
-	unsigned int bit_clk_inv:1;
-	unsigned int frm_clk_inv:1;
-	unsigned int sys_delay:1;
-	unsigned int data_alignment:1;
-
-	struct rsnd_mod *dma[2];
-};
-
 #define rsnd_rdai_nr(priv) ((priv)->rdai_nr)
 #define rsnd_rdai_is_clk_master(rdai) ((rdai)->clk_master)
 #define rsnd_rdai_to_priv(rdai) ((rdai)->priv)
@@ -708,6 +688,27 @@ int rsnd_kctrl_new(struct rsnd_mod *mod,
 	rsnd_kctrl_new(mod, io, rtd, name, accept, update, rsnd_kctrl_init_s(cfg), \
 		       texts, 0, 1, size)
 
+struct rsnd_dai {
+	char name[RSND_DAI_NAME_SIZE];
+	struct rsnd_dai_stream playback;
+	struct rsnd_dai_stream capture;
+	struct rsnd_priv *priv;
+	struct snd_pcm_hw_constraint_list constraint;
+
+	int slots;		/* 1ch - 16ch */
+	int ssi_lane;		/* 1lane - 4lane */
+	int slot_width;		/* 16,24,32bits */
+
+	unsigned int clk_master:1;
+	unsigned int bit_clk_inv:1;
+	unsigned int frm_clk_inv:1;
+	unsigned int sys_delay:1;
+	unsigned int data_alignment:1;
+
+	struct rsnd_mod *dma[2];
+	struct rsnd_kctrl_cfg_s busif[2];
+};
+
 extern const char * const volume_ramp_rate[];
 #define VOLUME_RAMP_MAX_DVC	(0x17 + 1)
 #define VOLUME_RAMP_MAX_MIX	(0x0a + 1)
@@ -720,6 +721,7 @@ void rsnd_ssi_remove(struct rsnd_priv *priv);
 struct rsnd_mod *rsnd_ssi_mod_get(struct rsnd_priv *priv, int id);
 int rsnd_ssi_is_dma_mode(struct rsnd_mod *mod);
 int rsnd_ssi_use_busif(struct rsnd_dai_stream *io);
+int rsnd_ssi_get_busif(struct rsnd_dai_stream *io);
 int rsnd_ssi_tdm_mode(struct rsnd_dai_stream *io);
 u32 rsnd_ssi_multi_slaves_runtime(struct rsnd_dai_stream *io);
 
