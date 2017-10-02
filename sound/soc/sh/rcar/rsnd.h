@@ -462,6 +462,7 @@ int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io);
 enum rsnd_tdm_mode_type {
 	TDM_MODE_BASIC,
 	TDM_MODE_EXTENDED,
+	TDM_MODE_SPLIT,
 };
 
 /*

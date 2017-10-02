@@ -11,6 +11,9 @@
 
 #define SSIU_NAME "ssiu"
 
+#define TDM_SPLIT (1 << 8)
+#define FS_MODE (1 << 13)
+
 struct rsnd_ssiu {
 	struct rsnd_mod mod;
 	u32 ssiu_status[8];
@@ -130,6 +133,7 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 	int ret;
 	u32 mode = 0, mode2 = 0;
 	struct rsnd_ssiu *ssiu = rsnd_mod_to_ssiu(mod);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
 
 	ret = rsnd_ssiu_init(mod, io, priv);
 	if (ret < 0)
@@ -137,7 +141,7 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 
 	ssiu->usrcnt++;
 
-	if (rsnd_ssi_tdm_mode(io) == TDM_MODE_EXTENDED) {
+	if (tdm_mode == TDM_MODE_EXTENDED) {
 		/*
 		 * TDM Extend Mode
 		 * see
@@ -153,6 +157,14 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 				rsnd_runtime_channel_after_ctu(io) :
 				rsnd_runtime_channel_original(io);
 		int busif = rsnd_ssi_get_busif(io);
+
+		if (tdm_mode == TDM_MODE_SPLIT) {
+			u32 mode = TDM_SPLIT;
+
+			if (chnl == 1)
+				mode |= FS_MODE;
+			rsnd_mod_write(mod, SSI_MODE, mode);
+		}
 
 		switch (busif) {
 		case 0:

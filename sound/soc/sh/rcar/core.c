@@ -250,17 +250,23 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 	int chan = rsnd_io_is_play(io) ?
 		rsnd_runtime_channel_after_ctu_with_params(io, params) :
 		rsnd_runtime_channel_original_with_params(io, params);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
 
 	/* Use Multi SSI */
 	if (rsnd_runtime_is_ssi_multi(io))
 		chan /= rsnd_rdai_ssi_lane_get(rdai);
 
-	/* TDM Extend Mode needs special handling */
-	if (rsnd_ssi_tdm_mode(io) == TDM_MODE_EXTENDED) {
+	switch (tdm_mode) {
+	case TDM_MODE_EXTENDED:
+		/* TDM Extend Mode needs special handling */
 		if (chan == 6)
 			chan = 8;
 		else if (chan == 8)
 			chan = 6;
+		break;
+	case TDM_MODE_SPLIT:
+		chan = rdai->slots;
+		break;
 	}
 
 	return chan;

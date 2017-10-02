@@ -107,6 +107,7 @@
 static const char * const ssi_tdm_mode[] = {
 	"Basic",
 	"TDM Extended",
+	"TDM Split",
 };
 
 struct rsnd_ssi {
@@ -292,9 +293,10 @@ u32 rsnd_ssi_multi_slaves_runtime(struct rsnd_dai_stream *io)
 
 static u32 rsnd_get_swl(struct rsnd_dai *rdai, bool is_monaural)
 {
-	u32 swl = is_monaural ? SWL_MONO_32 : SWL_32;
+	u32 swl;
 
 	switch (rdai->slot_width) {
+	default:
 	case 32:
 		swl = is_monaural ? SWL_MONO_32 : SWL_32;
 		break;
@@ -357,7 +359,8 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 		rsnd_src_get_out_rate(priv, io) :
 		rsnd_src_get_in_rate(priv, io);
 	int slot_width = rdai->slot_width;
-	u32 swl = rsnd_get_swl(rdai, rsnd_runtime_is_ssi_monaural(io));
+	bool is_monaural = rsnd_runtime_is_ssi_monaural(io);
+	u32 swl = rsnd_get_swl(rdai, is_monaural);
 
 	if (!rsnd_rdai_is_clk_master(rdai))
 		return 0;
@@ -444,6 +447,7 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 	int is_tdm;
 	int is_tdm16;
 	int is_monaural;
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
 
 	chnl = rsnd_runtime_channel_for_ssi(io);
 	is_tdm = rsnd_runtime_is_ssi_tdm(io);
@@ -470,10 +474,16 @@ static void rsnd_ssi_config_init(struct rsnd_mod *mod,
 		cr_own |= DWL_8;
 		break;
 	case 16:
-		cr_own |= DWL_16;
+		if (tdm_mode == TDM_MODE_SPLIT)
+			cr_own |= DWL_32;
+		else
+			cr_own |= DWL_16;
 		break;
 	case 24:
-		cr_own |= DWL_24;
+		if (tdm_mode == TDM_MODE_SPLIT)
+			cr_own |= DWL_32;
+		else
+			cr_own |= DWL_24;
 		break;
 	}
 
