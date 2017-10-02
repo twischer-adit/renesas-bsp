@@ -265,6 +265,7 @@ int rsnd_runtime_channel_for_ssi_with_params(struct rsnd_dai_stream *io,
 			chan = 6;
 		break;
 	case TDM_MODE_SPLIT:
+	case TDM_MODE_EXSPLIT:
 		chan = rdai->slots;
 		break;
 	}

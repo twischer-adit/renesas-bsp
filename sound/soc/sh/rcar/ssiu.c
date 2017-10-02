@@ -158,7 +158,8 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 				rsnd_runtime_channel_original(io);
 		int busif = rsnd_ssi_get_busif(io);
 
-		if (tdm_mode == TDM_MODE_SPLIT) {
+		if (tdm_mode == TDM_MODE_SPLIT ||
+		    tdm_mode == TDM_MODE_EXSPLIT) {
 			u32 mode = TDM_SPLIT;
 
 			if (chnl == 1)
@@ -193,7 +194,7 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 			break;
 		}
 
-		if (chnl == 16)
+		if (chnl == 16 || tdm_mode == TDM_MODE_EXSPLIT)
 			/* ex_func = 1 */
 			mode2 = 0x1;
 

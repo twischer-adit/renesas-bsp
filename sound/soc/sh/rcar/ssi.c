@@ -108,6 +108,7 @@ static const char * const ssi_tdm_mode[] = {
 	"Basic",
 	"TDM Extended",
 	"TDM Split",
+	"TDM Ex-Split",
 };
 
 struct rsnd_ssi {

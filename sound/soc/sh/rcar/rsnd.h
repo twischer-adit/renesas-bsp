@@ -463,6 +463,7 @@ enum rsnd_tdm_mode_type {
 	TDM_MODE_BASIC,
 	TDM_MODE_EXTENDED,
 	TDM_MODE_SPLIT,
+	TDM_MODE_EXSPLIT,
 };
 
 /*
