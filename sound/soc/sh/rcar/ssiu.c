@@ -17,6 +17,7 @@
 struct rsnd_ssiu {
 	struct rsnd_mod mod;
 	u32 ssiu_status[8];
+	u32 split_chnl_mask;
 	unsigned int usrcnt;
 };
 
@@ -125,6 +126,30 @@ static struct rsnd_mod_ops rsnd_ssiu_ops_gen1 = {
 	.init	= rsnd_ssiu_init,
 };
 
+static int rsnd_ssiu_exsplit_valid_channel(struct rsnd_mod *mod,
+					   struct rsnd_dai_stream *io)
+{
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	struct rsnd_ssiu *ssiu = rsnd_mod_to_ssiu(mod);
+	int chnl = rsnd_io_is_play(io) ?
+			rsnd_runtime_channel_after_ctu(io) :
+			rsnd_runtime_channel_original(io);
+	int busif = rsnd_ssi_get_busif(io);
+	u32 temp;
+
+	temp = ((1 << chnl) - 1) << (busif * 2);
+
+	if (ssiu->split_chnl_mask & temp) {
+		dev_err(dev, "channel number %d is not valid\n", chnl);
+		return -EINVAL;
+	}
+
+	ssiu->split_chnl_mask |= temp;
+
+	return 0;
+}
+
 static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 			       struct rsnd_dai_stream *io,
 			       struct rsnd_priv *priv)
@@ -138,6 +163,12 @@ static int rsnd_ssiu_init_gen2(struct rsnd_mod *mod,
 	ret = rsnd_ssiu_init(mod, io, priv);
 	if (ret < 0)
 		return ret;
+
+	if (tdm_mode == TDM_MODE_EXSPLIT) {
+		ret = rsnd_ssiu_exsplit_valid_channel(mod, io);
+		if (ret < 0)
+			return ret;
+	}
 
 	ssiu->usrcnt++;
 
@@ -263,9 +294,19 @@ static int rsnd_ssiu_stop_gen2(struct rsnd_mod *mod,
 {
 	struct rsnd_ssiu *ssiu = rsnd_mod_to_ssiu(mod);
 	int busif = rsnd_ssi_get_busif(io);
+	int chnl = rsnd_io_is_play(io) ?
+			rsnd_runtime_channel_after_ctu(io) :
+			rsnd_runtime_channel_original(io);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+	u32 temp;
 
 	if (!rsnd_ssi_use_busif(io))
 		return 0;
+
+	if (tdm_mode == TDM_MODE_EXSPLIT) {
+		temp = ((1 << chnl) - 1) << (busif * 2);
+		ssiu->split_chnl_mask &= ~temp;
+	}
 
 	rsnd_mod_bset(mod, SSI_CTRL, 1 << (busif * 4), 0);
 
