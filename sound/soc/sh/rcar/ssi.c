@@ -99,6 +99,7 @@
 #define MONO		(1 << 1)	/* WS Monaural Format */
 
 #define WIDTH_1		(1 << 16)	/* One cycle of SCK */
+#define AVB_MAX_RATE	25000000
 
 #define SSI_NAME "ssi"
 
@@ -316,7 +317,7 @@ static u32 rsnd_get_swl(struct rsnd_dai *rdai, bool is_monaural)
 }
 
 unsigned int rsnd_ssi_clk_query(struct rsnd_priv *priv,
-		       int param1, int param2, int param3, int *idx)
+		       int param1, int param2, int param3, int *idx, int use_avb)
 {
 	int ssi_clk_mul_table[] = {
 		1, 2, 4, 8, 16, 6, 12,
@@ -337,9 +338,14 @@ unsigned int rsnd_ssi_clk_query(struct rsnd_priv *priv,
 
 		main_rate = param1 * param2 * param3 * ssi_clk_mul_table[j];
 
-		ret = rsnd_adg_clk_query(priv, main_rate);
-		if (ret < 0)
-			continue;
+		if (use_avb) {
+			if (main_rate >= AVB_MAX_RATE)
+				continue;
+		} else {
+			ret = rsnd_adg_clk_query(priv, main_rate);
+			if (ret < 0)
+				continue;
+		}
 
 		if (idx)
 			*idx = j;
@@ -358,7 +364,7 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
 	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
 	int chan = rsnd_runtime_channel_for_ssi(io);
-	int idx, ret;
+	int idx, ret, use_avb = 0;
 	unsigned int main_rate;
 	unsigned int rate = rsnd_io_is_play(io) ?
 		rsnd_src_get_out_rate(priv, io) :
@@ -390,13 +396,18 @@ static int rsnd_ssi_master_clk_start(struct rsnd_mod *mod,
 		return 0;
 	}
 
-	main_rate = rsnd_ssi_clk_query(priv, rate, chan, slot_width, &idx);
+search_clock:
+	main_rate = rsnd_ssi_clk_query(priv, rate, chan, slot_width, &idx, use_avb);
 	if (!main_rate) {
+		if (!use_avb) {
+			use_avb = 1;
+			goto search_clock;
+		}
 		dev_err(dev, "unsupported clock rate\n");
 		return -EIO;
 	}
 
-	ret = rsnd_adg_ssi_clk_try_start(mod, main_rate);
+	ret = rsnd_adg_ssi_clk_try_start(mod, main_rate, use_avb);
 	if (ret < 0)
 		return ret;
 

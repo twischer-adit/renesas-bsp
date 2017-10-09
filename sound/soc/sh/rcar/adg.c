@@ -27,7 +27,10 @@
 #define AVB_CLK_NAME_SIZE	10
 #define AVB_CLK_NAME		"avb"
 #define AVB_CLK_NUM		8
+#define AVB_MAX_RATE		25000000
 #define AVB_ID_TO_SEL(id)	(((id) % 4) * 0x40 + ((id) / 4) * 8 + 0x30)
+
+#define SSI_NUM			10
 
 static struct rsnd_mod_ops adg_ops = {
 	.name = "adg",
@@ -44,6 +47,7 @@ struct rsnd_adg {
 	u32 rbga;
 	u32 rbgb;
 
+	int ssi_avb_idx[SSI_NUM];
 	unsigned int avb_data[AVB_CLK_NUM];
 	int rbga_rate_for_441khz; /* RBGA */
 	int rbgb_rate_for_48khz;  /* RBGB */
@@ -357,14 +361,88 @@ int rsnd_adg_clk_query(struct rsnd_priv *priv, unsigned int rate)
 	return -EIO;
 }
 
+static int rsnd_adg_find_avb_idx(struct rsnd_adg *adg, int *idx)
+{
+	int i;
+
+	for (i = 0; i < AVB_CLK_NUM; i++) {
+		if (!adg->clk_avb[i])
+			break;
+
+		if (!__clk_is_enabled(adg->clk_avb[i])) {
+			*idx = i;
+			return 0;
+		}
+	}
+
+	return -EBUSY;
+}
+
+static int rsnd_avb_clk_set(struct rsnd_mod *ssi_mod, unsigned int rate)
+{
+	struct rsnd_priv *priv = rsnd_mod_to_priv(ssi_mod);
+	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+	int avb_idx, ret;
+	int id = rsnd_mod_id(ssi_mod);
+	int data = 0;
+
+	ret = rsnd_adg_find_avb_idx(adg, &avb_idx);
+	if (ret < 0)
+		return ret;
+
+	/* avb_counter8 shall be used in less than 25Mhz */
+	if (rate >= AVB_MAX_RATE)
+		return -EIO;
+
+	/*
+	 * SSI 8 is not connected to ADG.
+	 * it works with SSI 7
+	 */
+	if (id == 8)
+		return data;
+
+	ret = clk_enable(adg->clk_avb[avb_idx]);
+	if (ret)
+		return ret;
+
+	ret = clk_set_rate(adg->clk_avb[avb_idx], rate);
+	if (ret) {
+		clk_disable(adg->clk_avb[avb_idx]);
+		return ret;
+	}
+
+	data = adg->avb_data[avb_idx];
+	adg->ssi_avb_idx[id] = avb_idx;
+
+	return data;
+}
+
 int rsnd_adg_ssi_clk_stop(struct rsnd_mod *ssi_mod)
 {
+	struct rsnd_priv *priv = rsnd_mod_to_priv(ssi_mod);
+	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+	int id = rsnd_mod_id(ssi_mod);
+	int avb_idx = adg->ssi_avb_idx[id];
+
 	rsnd_adg_set_ssi_clk(ssi_mod, 0);
+
+	/*
+	 * SSI 8 is not connected to ADG.
+	 * it works with SSI 7
+	 */
+	if (id == 8)
+		return 0;
+
+	if (avb_idx >= 0) {
+		adg->ssi_avb_idx[id] = -1;
+		clk_disable(adg->clk_avb[avb_idx]);
+	}
 
 	return 0;
 }
 
-int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
+int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate,
+			       int use_avb)
 {
 	struct rsnd_priv *priv = rsnd_mod_to_priv(ssi_mod);
 	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
@@ -373,7 +451,10 @@ int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
 	int data;
 	u32 ckr = 0;
 
-	data = rsnd_adg_clk_query(priv, rate);
+	if (use_avb)
+		data = rsnd_avb_clk_set(ssi_mod, rate);
+	else
+		data = rsnd_adg_clk_query(priv, rate);
 	if (data < 0)
 		return data;
 
@@ -637,6 +718,9 @@ int rsnd_adg_probe(struct rsnd_priv *priv)
 		adg->clk_avb[j] = clk;
 		adg->avb_data[j++] = AVB_ID_TO_SEL(i);
 	}
+
+	for (i = 0; i < SSI_NUM; i++)
+		adg->ssi_avb_idx[i] = -1;
 
 	ret = rsnd_mod_init(priv, &adg->mod, &adg_ops,
 		      NULL, NULL, 0, 0);
