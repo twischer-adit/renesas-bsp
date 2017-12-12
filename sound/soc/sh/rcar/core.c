@@ -1024,21 +1024,10 @@ static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 		ic.max = RSND_EXTMOD_CHAN_SLOT_SUM - slots;
 		break;
 	case TDM_MODE_SPLIT:
-		if (slots != 4 && slots != 8)
-			goto error;
-
-		if (busif > 3) {
-			dev_err(dev, "Invalid busif %d\n", busif);
-			return -EINVAL;
-		}
-
 		ic.min = slots / 4;
 		ic.max = slots / 4;
 		break;
 	case TDM_MODE_EXSPLIT:
-		if (slots != 8 && slots != 16)
-			goto error;
-
 		chnl = rsnd_exsplit_max_channel(busif, slots);
 		if (chnl == 0) {
 			dev_err(dev, "Invalid busif %d with slots %d\n",
@@ -1055,21 +1044,17 @@ static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 	ic.integer = 1;
 
 	return snd_interval_refine(ic_, &ic);
-
-error:
-	dev_err(dev, "Invalid slot number %d\n", slots);
-	return -EINVAL;
 }
 
-static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
-				   struct rsnd_dai_stream *io)
+static void rsnd_soc_find_channel_list(struct rsnd_dai_stream *io)
 {
 	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
 	struct snd_pcm_hw_constraint_list *constraint = &rdai->constraint;
 	int tdm_mode = rsnd_ssi_tdm_mode(io);
 	struct rsnd_mod *src = rsnd_io_to_mod_src(io);
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
 
-	/* Channel list constraints */
 	switch (tdm_mode) {
 	case TDM_MODE_BASIC:
 		if (src) {
@@ -1106,6 +1091,27 @@ static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
 				ARRAY_SIZE(rsnd_soc_hw_channels_exsplit_list);
 		}
 		break;
+	default:
+		dev_warn(dev, "Invalid tdm mode %d\n", tdm_mode);
+		break;
+	}
+}
+
+static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
+				   struct rsnd_dai_stream *io)
+{
+	struct rsnd_dai *rdai = rsnd_io_to_rdai(io);
+	struct snd_pcm_hw_constraint_list *constraint = &rdai->constraint;
+	struct rsnd_mod *ctu = rsnd_io_to_mod_ctu(io);
+	int is_play = rsnd_io_is_play(io);
+
+	/* Channel list constraints */
+	if (is_play && ctu) {
+		constraint->list = rsnd_soc_hw_channels_basic_src_list;
+		constraint->count =
+				ARRAY_SIZE(rsnd_soc_hw_channels_basic_src_list);
+	} else {
+		rsnd_soc_find_channel_list(io);
 	}
 
 	constraint->mask = 0;
@@ -1114,9 +1120,11 @@ static void rsnd_soc_hw_constraint(struct snd_pcm_runtime *runtime,
 				   SNDRV_PCM_HW_PARAM_CHANNELS, constraint);
 
 	/* More Channel constraints */
-	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-			    rsnd_soc_hw_rule_channels, io,
-			    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	if (!is_play || !ctu) {
+		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				    rsnd_soc_hw_rule_channels, io,
+				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	}
 
 	/* Format constraints */
 	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_FORMAT,

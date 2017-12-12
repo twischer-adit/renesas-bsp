@@ -260,18 +260,21 @@ static int rsnd_ctu_hw_params(struct rsnd_mod *mod,
 		struct snd_soc_dpcm *dpcm;
 		struct snd_pcm_hw_params *be_params;
 		int stream = substream->stream;
+		int fe_channel = params_channels(fe_params);
+		int is_play = rsnd_io_is_play(io);
 
 		list_for_each_entry(dpcm, &fe->dpcm[stream].be_clients, list_be) {
 			be_params = &dpcm->hw_params;
-			if (params_channels(fe_params) != params_channels(be_params))
+			if (fe_channel != params_channels(be_params))
 				ctu->channels = params_channels(be_params);
 		}
 
-		if (ctu->channels) {
-			int ret;
+		if (ctu->channels || is_play) {
+			int ret, channel;
 
+			channel = ctu->channels ? ctu->channels : fe_channel;
 			ret = rsnd_soc_ctu_channel_is_valid(io, fe_params,
-							    ctu->channels);
+							    channel);
 			if (!ret)
 				return -EINVAL;
 		}
