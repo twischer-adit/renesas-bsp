@@ -851,7 +851,7 @@ static const struct v4l2_dv_timings_cap adv76xx_timings_cap_digital = {
 		V4L2_DV_BT_STD_CEA861 | V4L2_DV_BT_STD_DMT |
 			V4L2_DV_BT_STD_GTF | V4L2_DV_BT_STD_CVT,
 		V4L2_DV_BT_CAP_PROGRESSIVE | V4L2_DV_BT_CAP_REDUCED_BLANKING |
-			V4L2_DV_BT_CAP_CUSTOM)
+			V4L2_DV_BT_CAP_CUSTOM | V4L2_DV_BT_CAP_INTERLACED)
 };
 
 /*
@@ -2720,6 +2720,11 @@ static void adv76xx_unregistered(struct v4l2_subdev *sd)
 	cec_unregister_adapter(state->cec_adap);
 }
 
+static int adv76xx_querystd(struct v4l2_subdev *sd, v4l2_std_id *std)
+{
+	return 0;
+}
+
 /* ----------------------------------------------------------------------- */
 
 static const struct v4l2_ctrl_ops adv76xx_ctrl_ops = {
@@ -2744,6 +2749,7 @@ static const struct v4l2_subdev_video_ops adv76xx_video_ops = {
 	.s_dv_timings = adv76xx_s_dv_timings,
 	.g_dv_timings = adv76xx_g_dv_timings,
 	.query_dv_timings = adv76xx_query_dv_timings,
+	.querystd = adv76xx_querystd,
 };
 
 static const struct v4l2_subdev_pad_ops adv76xx_pad_ops = {
