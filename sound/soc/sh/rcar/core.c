@@ -935,7 +935,7 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 				      SNDRV_PCM_HW_PARAM_PERIODS);
 
 	/*
-	 * Sampling Rate / Channel Limitation
+	 * Sampling Rate
 	 * It depends on Clock Master Mode
 	 */
 	if (rsnd_rdai_is_clk_master(rdai)) {
@@ -943,11 +943,12 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 				    rsnd_soc_hw_rule_rate,
 				    dai,
 				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				    rsnd_soc_hw_rule_channels,
-				    dai,
-				    SNDRV_PCM_HW_PARAM_RATE, -1);
 	}
+
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+			    rsnd_soc_hw_rule_channels,
+			    dai,
+			    SNDRV_PCM_HW_PARAM_RATE, -1);
 
 	/*
 	 * call rsnd_dai_call without spinlock
