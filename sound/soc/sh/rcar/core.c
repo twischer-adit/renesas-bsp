@@ -801,104 +801,20 @@ static unsigned int rsnd_soc_hw_channels_list[] = {
 	2, 6, 8,
 };
 
-static unsigned int rsnd_soc_hw_rate_list[] = {
-	  8000,
-	 11025,
-	 16000,
-	 22050,
-	 32000,
-	 44100,
-	 48000,
-	 64000,
-	 88200,
-	 96000,
-	176400,
-	192000,
-};
-
-static int rsnd_soc_hw_rule(struct rsnd_dai *rdai,
-			    unsigned int *list, int list_num,
-			    struct snd_interval *baseline, struct snd_interval *iv)
-{
-	struct rsnd_priv *priv = rsnd_rdai_to_priv(rdai);
-	struct snd_interval p;
-	unsigned int rate;
-	int i;
-	int slot_width = rsnd_rdai_width_get(rdai);
-
-	snd_interval_any(&p);
-	p.min = UINT_MAX;
-	p.max = 0;
-
-	for (i = 0; i < list_num; i++) {
-
-		if (!snd_interval_test(iv, list[i]))
-			continue;
-
-		rate = rsnd_ssi_clk_query(priv, baseline->min,
-					  list[i], slot_width, NULL);
-		if (rate > 0) {
-			p.min = min(p.min, list[i]);
-			p.max = max(p.max, list[i]);
-		}
-
-		rate = rsnd_ssi_clk_query(priv, baseline->max,
-					  list[i], slot_width, NULL);
-		if (rate > 0) {
-			p.min = min(p.min, list[i]);
-			p.max = max(p.max, list[i]);
-		}
-	}
-
-	return snd_interval_refine(iv, &p);
-}
-
-static int rsnd_soc_hw_rule_rate(struct snd_pcm_hw_params *params,
-				 struct snd_pcm_hw_rule *rule)
-{
-	struct snd_interval *ic_ = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval *ir = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval ic;
-	struct snd_soc_dai *dai = rule->private;
-	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
-	struct rsnd_dai_stream *io = rule->private;
-
-	/*
-	 * possible sampling rate limitation is same as
-	 * 2ch if it supports multi ssi
-	 * and same as 8ch if TDM 6ch (see rsnd_ssi_config_init())
-	 */
-	ic = *ic_;
-	ic.min =
-	ic.max = rsnd_runtime_channel_for_ssi_with_params(io, params);
-
-	return rsnd_soc_hw_rule(rdai, rsnd_soc_hw_rate_list,
-				ARRAY_SIZE(rsnd_soc_hw_rate_list),
-				&ic, ir);
-}
-
 static int rsnd_soc_hw_rule_channels(struct snd_pcm_hw_params *params,
 				     struct snd_pcm_hw_rule *rule)
 {
 	struct snd_interval *ic_ = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval *ir = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	struct snd_interval ic;
-	struct snd_soc_dai *dai = rule->private;
-	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
 	struct rsnd_dai_stream *io = rule->private;
 
-	/*
-	 * possible sampling rate limitation is same as
-	 * 2ch if it supports multi ssi
-	 * and same as 8ch if TDM 6ch (see rsnd_ssi_config_init())
-	 */
+	snd_interval_any(&ic);
+
 	ic = *ic_;
 	ic.min =
 	ic.max = rsnd_runtime_channel_for_ssi_with_params(io, params);
 
-	return rsnd_soc_hw_rule(rdai, rsnd_soc_hw_channels_list,
-				ARRAY_SIZE(rsnd_soc_hw_channels_list),
-				ir, &ic);
+	return snd_interval_refine(ic_, &ic);
 }
 
 static const struct snd_pcm_hardware rsnd_pcm_hardware = {
@@ -940,17 +856,6 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 
 	snd_pcm_hw_constraint_integer(runtime,
 				      SNDRV_PCM_HW_PARAM_PERIODS);
-
-	/*
-	 * Sampling Rate
-	 * It depends on Clock Master Mode
-	 */
-	if (rsnd_rdai_is_clk_master(rdai)) {
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				    rsnd_soc_hw_rule_rate,
-				    dai,
-				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-	}
 
 	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 			    rsnd_soc_hw_rule_channels,
