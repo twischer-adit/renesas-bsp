@@ -543,12 +543,12 @@ void rsnd_dai_disconnect(struct rsnd_mod *mod,
 }
 
 int rsnd_rdai_channels_ctrl(struct rsnd_dai *rdai,
-			    int max_channels)
+			    int slots)
 {
-	if (max_channels > 0)
-		rdai->max_channels = max_channels;
+	if (slots > 0)
+		rdai->slots = slots;
 
-	return rdai->max_channels;
+	return rdai->slots;
 }
 
 int rsnd_rdai_ssi_lane_ctrl(struct rsnd_dai *rdai,
@@ -940,9 +940,7 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 	struct rsnd_dai_stream *io = rsnd_rdai_to_io(rdai, substream);
 	struct snd_pcm_hw_constraint_list *constraint = &rdai->constraint;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	unsigned int max_channels = rsnd_rdai_channels_get(rdai);
 	int ret;
-	int i;
 
 	rsnd_dai_stream_init(io, substream);
 
@@ -951,14 +949,8 @@ static int rsnd_soc_dai_startup(struct snd_pcm_substream *substream,
 	 * It depends on Platform design
 	 */
 	constraint->list	= rsnd_soc_hw_channels_list;
-	constraint->count	= 0;
+	constraint->count	= ARRAY_SIZE(rsnd_soc_hw_channels_list);
 	constraint->mask	= 0;
-
-	for (i = 0; i < ARRAY_SIZE(rsnd_soc_hw_channels_list); i++) {
-		if (rsnd_soc_hw_channels_list[i] > max_channels)
-			break;
-		constraint->count = i + 1;
-	}
 
 	snd_soc_set_runtime_hwparams(substream, &rsnd_pcm_hardware);
 

@@ -476,7 +476,7 @@ struct rsnd_dai {
 	struct rsnd_priv *priv;
 	struct snd_pcm_hw_constraint_list constraint;
 
-	int max_channels;	/* 1ch - 16ch */
+	int slots;		/* 1ch - 16ch */
 	int ssi_lane;		/* 1lane - 4lane */
 	int slot_width;		/* 16,24,32bits */
 
@@ -500,12 +500,12 @@ struct rsnd_dai {
 
 struct rsnd_dai *rsnd_rdai_get(struct rsnd_priv *priv, int id);
 
-#define rsnd_rdai_channels_set(rdai, max_channels) \
-	rsnd_rdai_channels_ctrl(rdai, max_channels)
+#define rsnd_rdai_channels_set(rdai, slots) \
+	rsnd_rdai_channels_ctrl(rdai, slots)
 #define rsnd_rdai_channels_get(rdai) \
 	rsnd_rdai_channels_ctrl(rdai, 0)
 int rsnd_rdai_channels_ctrl(struct rsnd_dai *rdai,
-			    int max_channels);
+			    int slots);
 
 #define rsnd_rdai_ssi_lane_set(rdai, ssi_lane) \
 	rsnd_rdai_ssi_lane_ctrl(rdai, ssi_lane)
