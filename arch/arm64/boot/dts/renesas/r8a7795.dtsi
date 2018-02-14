@@ -2486,6 +2486,7 @@
 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+				 <&clk_avb 5>, <&clk_avb 6>, <&clk_avb 7>,
 				 <&audio_clk_a>, <&audio_clk_b>,
 				 <&audio_clk_c>,
 				 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
@@ -2499,6 +2500,7 @@
 				      "mix.1", "mix.0",
 				      "ctu.1", "ctu.0",
 				      "dvc.0", "dvc.1",
+				      "avb.5", "avb.6", "avb.7",
 				      "clk_a", "clk_b", "clk_c", "clk_i";
 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
 			resets = <&cpg 1005>,
