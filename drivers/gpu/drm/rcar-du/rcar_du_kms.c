@@ -603,6 +603,10 @@ static int rcar_du_vsps_init(struct rcar_du_device *rcdu)
 		/* Store the VSP pointer and pipe index in the CRTC. */
 		rcdu->crtcs[i].vsp = &rcdu->vsps[j];
 		rcdu->crtcs[i].vsp_pipe = cells >= 1 ? args.args[0] : 0;
+
+		/* Has VSPDL */
+		if (rcdu->crtcs[i].vsp_pipe)
+			rcdu->vspdl_use = true;
 	}
 
 	/*
@@ -653,6 +657,7 @@ int rcar_du_modeset_init(struct rcar_du_device *rcdu)
 	dev->mode_config.helper_private = &rcar_du_mode_config_helper;
 
 	rcdu->num_crtcs = rcdu->info->num_crtcs;
+	rcdu->vspdl_use = false;
 
 	ret = rcar_du_properties_init(rcdu);
 	if (ret < 0)
