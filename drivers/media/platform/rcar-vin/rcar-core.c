@@ -1433,7 +1433,7 @@ static int rcar_vin_suspend(struct device *dev)
 			bool enable;
 
 			enable = __clk_is_enabled(vin->clk);
-			if (enable)
+			if (!enable)
 				break;
 			if (!timeout) {
 				dev_warn(vin->dev, "MSTP status timeout\n");
