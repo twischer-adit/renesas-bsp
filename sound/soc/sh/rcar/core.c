@@ -1388,6 +1388,60 @@ static int rsnd_dai_probe(struct rsnd_priv *priv)
 /*
  *		pcm ops
  */
+
+static int rsnd_check_hw_params(struct rsnd_dai *rdai,
+				struct rsnd_dai_stream *io)
+{
+	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	int slots = rsnd_rdai_slots_get(rdai);
+	int tdm_mode = rsnd_ssi_tdm_mode(io);
+	int busif = rsnd_ssi_get_busif(io);
+	int id = rsnd_mod_id(mod);
+
+	switch (tdm_mode) {
+	case TDM_MODE_SPLIT:
+		if (slots != 4 && slots != 8) {
+			dev_err(dev, "Split mode doesn't support %d slots\n",
+				slots);
+			return -EINVAL;
+		}
+
+		if (busif > 3) {
+			dev_err(dev, "Invalid busif %d\n", busif);
+			return -EINVAL;
+		}
+
+		if (id > 2 && id < 9) {
+			dev_err(dev, "ssi[%d] can't work in Split mode\n", id);
+			return -EINVAL;
+		}
+		break;
+	case TDM_MODE_EXSPLIT:
+		if (slots != 8 && slots != 16) {
+			dev_err(dev, "Ex-Split mode doesn't support %d slots\n",
+				slots);
+			return -EINVAL;
+		}
+
+		if (id > 4 && id < 9) {
+			dev_err(dev, "ssi[%d] can't work in Ex-Split mode\n",
+				id);
+			return -EINVAL;
+		}
+		break;
+	default:
+		if (busif != 0) {
+			dev_err(dev, "Invalid to use busif%d\n", busif);
+			return -EINVAL;
+		}
+		break;
+	}
+
+	return 0;
+}
+
 static int rsnd_hw_params(struct snd_pcm_substream *substream,
 			 struct snd_pcm_hw_params *hw_params)
 {
@@ -1397,6 +1451,10 @@ static int rsnd_hw_params(struct snd_pcm_substream *substream,
 	int ret;
 
 	ret = rsnd_dai_call(hw_params, io, substream, hw_params);
+	if (ret)
+		return ret;
+
+	ret = rsnd_check_hw_params(rdai, io);
 	if (ret)
 		return ret;
 
