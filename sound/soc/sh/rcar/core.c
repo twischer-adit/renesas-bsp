@@ -1396,6 +1396,7 @@ static int rsnd_check_hw_params(struct rsnd_dai *rdai,
 	struct rsnd_priv *priv = rsnd_io_to_priv(io);
 	struct device *dev = rsnd_priv_to_dev(priv);
 	int slots = rsnd_rdai_slots_get(rdai);
+	int slot_width = rsnd_rdai_slot_width_get(rdai);
 	int tdm_mode = rsnd_ssi_tdm_mode(io);
 	int busif = rsnd_ssi_get_busif(io);
 	int id = rsnd_mod_id(mod);
@@ -1405,6 +1406,13 @@ static int rsnd_check_hw_params(struct rsnd_dai *rdai,
 		if (slots != 4 && slots != 8) {
 			dev_err(dev, "Split mode doesn't support %d slots\n",
 				slots);
+			return -EINVAL;
+		}
+
+		if (slot_width != 32) {
+			dev_err(dev,
+				"Split mode doesn't support slot width %d\n",
+				slot_width);
 			return -EINVAL;
 		}
 
