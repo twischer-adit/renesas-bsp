@@ -308,6 +308,9 @@ static u32 rsnd_get_swl(struct rsnd_dai *rdai, bool is_monaural)
 	case 16:
 		swl = is_monaural ? SWL_MONO_16 : SWL_16;
 		break;
+	case 8:
+		swl = is_monaural ? SWL_MONO_16 : SWL_8;
+		break;
 	}
 	return swl;
 }

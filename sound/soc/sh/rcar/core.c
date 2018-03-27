@@ -763,7 +763,13 @@ static int rsnd_soc_set_dai_tdm_slot(struct snd_soc_dai *dai,
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
 	struct device *dev = rsnd_priv_to_dev(priv);
 
-	if (slot_width != 16 && slot_width != 24 && slot_width != 32) {
+	switch (slot_width) {
+	case 8:
+	case 16:
+	case 24:
+	case 32:
+		break;
+	default:
 		dev_err(dev, "unsupported slot width value: %d\n", slot_width);
 		return -EINVAL;
 	}
@@ -1430,6 +1436,13 @@ static int rsnd_check_hw_params(struct rsnd_dai *rdai,
 		if (slots != 8 && slots != 16) {
 			dev_err(dev, "Ex-Split mode doesn't support %d slots\n",
 				slots);
+			return -EINVAL;
+		}
+
+		if (slot_width == 8) {
+			dev_err(dev,
+				"Ex-Split mode doesn't support slot width %d\n",
+				slot_width);
 			return -EINVAL;
 		}
 
