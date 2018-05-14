@@ -1265,9 +1265,13 @@ static int rsnd_kctrl_put(struct snd_kcontrol *kctrl,
 {
 	struct rsnd_kctrl_cfg *cfg = snd_kcontrol_chip(kctrl);
 	int i, change = 0;
+	struct rsnd_priv *priv = rsnd_io_to_priv(cfg->io);
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv->lock, flags);
 
 	if (!cfg->accept(cfg->io))
-		return 0;
+		goto out;
 
 	for (i = 0; i < cfg->size; i++) {
 		if (cfg->texts) {
@@ -1281,6 +1285,9 @@ static int rsnd_kctrl_put(struct snd_kcontrol *kctrl,
 
 	if (change && cfg->update)
 		cfg->update(cfg->io, cfg->mod);
+
+out:
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return change;
 }

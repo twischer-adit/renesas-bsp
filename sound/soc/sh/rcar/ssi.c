@@ -125,6 +125,7 @@ struct rsnd_ssi {
 	int rate;
 	int irq;
 	unsigned int usrcnt;
+	unsigned int parentcnt;
 
 	/* for PIO */
 	int byte_pos;
@@ -556,6 +557,9 @@ static int rsnd_ssi_init(struct rsnd_mod *mod,
 
 	ssi->usrcnt++;
 
+	if (rsnd_ssi_is_parent(mod, io))
+		ssi->parentcnt++;
+
 	rsnd_mod_power_on(mod);
 
 	rsnd_ssi_config_init(mod, io);
@@ -589,6 +593,9 @@ static int rsnd_ssi_quit(struct rsnd_mod *mod,
 	rsnd_mod_power_off(mod);
 
 	ssi->usrcnt--;
+
+	if (rsnd_ssi_is_parent(mod, io))
+		ssi->parentcnt--;
 
 	if (!ssi->usrcnt) {
 		ssi->cr_own = 0;
@@ -974,6 +981,22 @@ static int rsnd_ssi_pio_pointer(struct rsnd_mod *mod,
 
 #define MAX_MODE_SIZE 20
 
+static int rsnd_ssi_kctrl_accept_idletime(struct rsnd_dai_stream *io)
+{
+	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);
+	struct rsnd_ssi *ssi = rsnd_mod_to_ssi(mod);
+	struct rsnd_priv *priv = rsnd_io_to_priv(io);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	int id = rsnd_mod_id(mod);
+
+	if (ssi->usrcnt - ssi->parentcnt) {
+		dev_warn(dev, "Can't update kctrl when SSI%d is busy\n", id);
+		return 0;
+	}
+
+	return 1;
+}
+
 static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
 			    struct rsnd_dai_stream *io,
 			    struct snd_soc_pcm_runtime *rtd)
@@ -991,7 +1014,7 @@ static int rsnd_ssi_pcm_new(struct rsnd_mod *mod,
 	snprintf(mode, sizeof(mode), "SSI%d TDM Mode", id);
 	if (!ssi->tdm_mode.cfg.io) {
 		ret = rsnd_kctrl_new_single_e(mod, io, rtd, mode,
-					      rsnd_kctrl_accept_anytime,
+					      rsnd_ssi_kctrl_accept_idletime,
 					      NULL, &ssi->tdm_mode,
 					      ssi_tdm_mode,
 					      ARRAY_SIZE(ssi_tdm_mode));
