@@ -290,9 +290,10 @@ int rsnd_runtime_is_ssi_tdm(struct rsnd_dai_stream *io)
 	return rsnd_runtime_channel_for_ssi(io) >= 4;
 }
 
-int rsnd_runtime_is_ssi_monaural(struct rsnd_dai_stream *io)
+int rsnd_runtime_is_ssi_monaural_with_params(struct rsnd_dai_stream *io,
+					     struct snd_pcm_hw_params *params)
 {
-	return rsnd_runtime_channel_for_ssi(io) == 1;
+	return rsnd_runtime_channel_for_ssi_with_params(io, params) == 1;
 }
 
 /*
@@ -1396,7 +1397,8 @@ static int rsnd_dai_probe(struct rsnd_priv *priv)
  */
 
 static int rsnd_check_hw_params(struct rsnd_dai *rdai,
-				struct rsnd_dai_stream *io)
+				struct rsnd_dai_stream *io,
+				struct snd_pcm_hw_params *params)
 {
 	struct rsnd_mod *mod = rsnd_io_to_mod_ssi(io);
 	struct rsnd_priv *priv = rsnd_io_to_priv(io);
@@ -1405,9 +1407,19 @@ static int rsnd_check_hw_params(struct rsnd_dai *rdai,
 	int slot_width = rsnd_rdai_slot_width_get(rdai);
 	int tdm_mode = rsnd_ssi_tdm_mode(io);
 	int busif = rsnd_ssi_get_busif(io);
+	bool is_monaural = rsnd_runtime_is_ssi_monaural_with_params(io, params);
 	int id = rsnd_mod_id(mod);
 
 	switch (tdm_mode) {
+	case TDM_MODE_BASIC:
+		if (is_monaural) {
+			if (slot_width != 16 && slot_width != 32) {
+				dev_err(dev, "Basic mode doesn't support slot width %d for monaural stream\n",
+					slot_width);
+				return -EINVAL;
+			}
+		}
+		break;
 	case TDM_MODE_SPLIT:
 		if (slots != 4 && slots != 8) {
 			dev_err(dev, "Split mode doesn't support %d slots\n",
@@ -1475,7 +1487,7 @@ static int rsnd_hw_params(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
-	ret = rsnd_check_hw_params(rdai, io);
+	ret = rsnd_check_hw_params(rdai, io, hw_params);
 	if (ret)
 		return ret;
 
