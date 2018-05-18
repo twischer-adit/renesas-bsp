@@ -511,6 +511,13 @@ error:
 	return ret;
 }
 
+static void rcar_du_shutdown(struct platform_device *pdev)
+{
+#ifdef CONFIG_PM_SLEEP
+	rcar_du_pm_suspend(&pdev->dev);
+#endif
+}
+
 static struct platform_driver rcar_du_platform_driver = {
 	.probe		= rcar_du_probe,
 	.remove		= rcar_du_remove,
@@ -519,6 +526,7 @@ static struct platform_driver rcar_du_platform_driver = {
 		.pm	= &rcar_du_pm_ops,
 		.of_match_table = rcar_du_of_table,
 	},
+	.shutdown       = rcar_du_shutdown,
 };
 
 module_platform_driver(rcar_du_platform_driver);
